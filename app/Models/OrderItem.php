@@ -18,6 +18,7 @@ class OrderItem extends Model
         'product_id',
         'quantity',
         'price',
+        'purchase_price',
         'total',
         'notes',
     ];
@@ -28,6 +29,7 @@ class OrderItem extends Model
     protected $casts = [
         'quantity' => 'integer',
         'price' => 'decimal:2',
+        'purchase_price' => 'decimal:2',
         'total' => 'decimal:2',
     ];
 

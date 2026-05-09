@@ -39,6 +39,23 @@
                         <span class="text-2xl font-black text-[#0c4a6e]">{{ $summary->total_orders ?? 0 }}</span>
                     </div>
 
+                    <!-- Order Types Breakdown -->
+                    <div class="bg-indigo-50 p-4 rounded-2xl space-y-2">
+                        <p class="font-bold text-slate-700">تفصيل أنواع الطلبات</p>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-slate-600">طلبات دليفري</span>
+                            <span class="font-black text-indigo-700">{{ $summary->delivery_orders_count ?? 0 }}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-slate-600">طلبات تيك أواي</span>
+                            <span class="font-black text-indigo-700">{{ $summary->takeaway_orders_count ?? 0 }}</span>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-slate-600">طلبات داخل المحل</span>
+                            <span class="font-black text-indigo-700">{{ $summary->store_orders_count ?? 0 }}</span>
+                        </div>
+                    </div>
+
                     <!-- Discounts -->
                     <div class="flex items-center justify-between bg-red-50 p-4 rounded-2xl">
                         <div class="flex items-center gap-3">
@@ -46,6 +63,24 @@
                             <span class="font-bold text-slate-600">إجمالي الخصومات</span>
                         </div>
                         <span class="text-2xl font-black text-red-600">{{ number_format($summary->total_discounts ?? 0, 2) }}</span>
+                    </div>
+
+                    <!-- Expenses -->
+                    <div class="flex items-center justify-between bg-orange-50 p-4 rounded-2xl">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-orange-100 p-2 rounded-lg text-2xl text-orange-600">💰</div>
+                            <span class="font-bold text-slate-600">إجمالي المصاريف</span>
+                        </div>
+                        <span class="text-2xl font-black text-orange-600">{{ number_format($summary->total_expenses ?? 0, 2) }}</span>
+                    </div>
+
+                    <!-- Net Profit -->
+                    <div class="flex items-center justify-between bg-green-50 p-4 rounded-2xl">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-green-100 p-2 rounded-lg text-2xl text-green-600">📈</div>
+                            <span class="font-bold text-slate-600">صافي الربح</span>
+                        </div>
+                        <span class="text-2xl font-black text-green-600">{{ number_format($summary->net_profit ?? 0, 2) }}</span>
                     </div>
 
                     <!-- Print Button -->

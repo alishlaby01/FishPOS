@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * @var array<int, string>
@@ -18,6 +19,11 @@ class Product extends Model
         'category_id',
         'name',
         'price',
+        'purchase_price',
+        'current_stock',
+        'min_stock',
+        'unit',
+        'product_type', // إضافة نوع المنتج
         'active',
     ];
 
@@ -26,7 +32,11 @@ class Product extends Model
      */
     protected $casts = [
         'price' => 'decimal:2',
+        'purchase_price' => 'decimal:2',
+        'current_stock' => 'decimal:2',
+        'min_stock' => 'decimal:2',
         'active' => 'boolean',
+        'product_type' => 'string',
     ];
 
     public function category(): BelongsTo
@@ -37,5 +47,17 @@ class Product extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function stockEntries(): HasMany
+    {
+        return $this->hasMany(StockEntry::class);
+    }
+
+    // حساب الكمية الحالية: الوارد - الصادر
+    public function getCurrentStockAttribute()
+    {
+        return $this->stockEntries()->where('type', 'in')->sum('quantity') -
+               $this->stockEntries()->whereIn('type', ['out', 'waste'])->sum('quantity');
     }
 }

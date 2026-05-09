@@ -1,8 +1,124 @@
 @import "tailwindcss";
 
-@source "../views/**/*.blade.php";
-@source "../js/**/*.js";
+@layer base {
+  html {
+    background: #050505;
+  }
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  body {
+    font-family: 'Cairo', sans-serif;
+  }
+}
+
+@layer components {
+  /* Button Components */
+  .btn-primary {
+    background-color: #DFFF00;
+    color: #131313;
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+  }
+
+  .btn-primary:hover {
+    background-color: #b8d300;
+  }
+
+  .btn-secondary {
+    background-color: #d1beef;
+    color: #131313;
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+  }
+
+  .btn-secondary:hover {
+    background-color: #a8a8a8;
+  }
+
+  .btn-danger {
+    background-color: #ef4444;
+    color: white;
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+  }
+
+  .btn-danger:hover {
+    background-color: #dc2626;
+  }
+
+  /* Card Components */
+  .card {
+    background-color: #131313;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Form Components */
+  .input {
+    border: 1px solid #374151;
+    border-radius: 0.25rem;
+    padding: 0.5rem 0.75rem;
+    background-color: #131313;
+    color: #e5e2e1;
+  }
+
+  .table {
+    width: 100%;
+    font-size: 0.875rem;
+    text-align: left;
+    color: #e5e2e1;
+  }
+
+  .table th {
+    padding: 0.75rem 1.5rem;
+    background-color: #0a0a0a;
+    color: #e5e2e1;
+  }
+
+  .table td {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #1f2937;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-receipt, .print-receipt * {
+    visibility: visible;
+  }
+  .print-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+    font-size: 12px;
+    background: white !important;
+    color: black !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 20px !important;
+  }
+  .print-receipt .text-stone-100 { color: black !important; }
+  .print-receipt .text-stone-400 { color: #666 !important; }
+  .print-receipt .text-accent { color: #000 !important; }
+  .print-receipt .border-stone-800 { border-color: #ccc !important; }
 }

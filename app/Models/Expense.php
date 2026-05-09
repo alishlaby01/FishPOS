@@ -18,6 +18,7 @@ class Expense extends Model
         'amount',
         'notes',
         'created_by',
+        'shift_id',
     ];
 
     /**
@@ -30,5 +31,10 @@ class Expense extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
     }
 }

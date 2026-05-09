@@ -11,9 +11,6 @@ class Order extends Model
 {
     use HasFactory;
 
-    /**
-     * @var array<int, string>
-     */
     protected $fillable = [
         'invoice_number',
         'order_type',
@@ -26,15 +23,16 @@ class Order extends Model
         'total',
         'status',
         'created_by',
+        'shift_id',          // جديد
+        'driver_id',         // جديد
+        'driver_commission', // جديد
     ];
 
-    /**
-     * @var array<string, string>
-     */
     protected $casts = [
         'subtotal' => 'decimal:2',
         'discount' => 'decimal:2',
         'delivery_fee' => 'decimal:2',
+        'driver_commission' => 'decimal:2', // جديد
         'total' => 'decimal:2',
     ];
 
@@ -46,5 +44,17 @@ class Order extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    // علاقة الوردية
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
+    }
+
+    // علاقة الطيار
+    public function driver(): BelongsTo
+    {
+        return $this->belongsTo(Driver::class);
     }
 }

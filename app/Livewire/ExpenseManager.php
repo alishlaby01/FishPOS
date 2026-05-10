@@ -102,23 +102,35 @@ class ExpenseManager extends Component
 
     public function render()
     {
+        $activeShift = Shift::where('user_id', Auth::id())
+            ->whereNull('closed_at')
+            ->first();
+
         $expenses = Expense::with(['creator', 'shift'])
+            ->when($activeShift, fn ($q) => $q->where('shift_id', $activeShift->id))
+            ->when(! $activeShift && Auth::user()?->role === 'cashier', fn ($q) => $q->whereRaw('1 = 0'))
             ->when($this->search, function ($query) {
-                $query->where('title', 'like', '%' . $this->search . '%')
-                      ->orWhere('notes', 'like', '%' . $this->search . '%');
+                $query->where(function ($q) {
+                    $q->where('title', 'like', '%' . $this->search . '%')
+                        ->orWhere('notes', 'like', '%' . $this->search . '%');
+                });
             })
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
-        $todayExpenses = Expense::query()
-            ->whereDate('created_at', today())
-            ->latest()
-            ->get();
+        $todayExpensesQuery = Expense::query()->latest();
+        if ($activeShift) {
+            $todayExpensesQuery->where('shift_id', $activeShift->id);
+        } elseif (Auth::user()?->role === 'cashier') {
+            $todayExpensesQuery->whereRaw('1 = 0');
+        } else {
+            $todayExpensesQuery->whereDate('created_at', today());
+        }
 
-        $todayTotalExpenses = (float) Expense::query()
-            ->whereDate('created_at', today())
-            ->sum('amount');
+        $todayExpenses = $todayExpensesQuery->get();
 
-        return view('livewire.expense-manager', compact('expenses', 'todayExpenses', 'todayTotalExpenses'));
+        $todayTotalExpenses = (float) $todayExpenses->sum('amount');
+
+        return view('livewire.expense-manager', compact('expenses', 'todayExpenses', 'todayTotalExpenses', 'activeShift'));
     }
 }

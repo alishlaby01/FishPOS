@@ -28,6 +28,13 @@
                 <a href="{{ route('expenses') }}" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700">
                     المصروفات
                 </a>
+                <button
+                    type="button"
+                    wire:click="$dispatch('openShiftManager')"
+                    class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-amber-500/30 transition hover:bg-amber-500"
+                >
+                    إدارة الوردية
+                </button>
                 @if(auth()->user()?->role === 'owner')
                     <a href="{{ route('products') }}" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700">
                         المنتجات والأسعار
@@ -108,7 +115,16 @@
             </section>
 
             <section class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
-                <h2 class="mb-4 text-lg font-bold text-white">الطلب الحالي</h2>
+                <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <h2 class="text-lg font-bold text-white">الطلب الحالي</h2>
+                    <button
+                        type="button"
+                        wire:click="$dispatch('openShiftManager')"
+                        class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-amber-500/30 transition hover:bg-amber-500"
+                    >
+                        إدارة الوردية
+                    </button>
+                </div>
 
                 <div class="space-y-2">
                     @forelse($cart as $id => $item)
@@ -137,9 +153,8 @@
                 </div>
 
                 <div class="mt-5 space-y-3 border-t border-slate-800 pt-4">
-                    <div class="grid grid-cols-2 gap-2">
-                        <input wire:model.live="discount" type="number" min="0" step="0.01" placeholder="خصم" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
-                        <input wire:model.live="deliveryFee" type="number" min="0" step="0.01" placeholder="رسوم التوصيل" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
+                    <div class="grid grid-cols-1 gap-2">
+                        <input wire:model.live="discount" type="number" min="0" step="0.01" placeholder="خصم على الأصناف" class="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                     </div>
 
                     <div class="grid grid-cols-3 gap-2 text-xs">
@@ -150,6 +165,8 @@
 
                     @if($orderType === 'delivery')
                         <div class="space-y-2 rounded-xl border border-indigo-800/40 bg-indigo-900/10 p-3">
+                            <label class="block text-xs font-semibold text-indigo-200">رسوم التوصيل (ج.م)</label>
+                            <input wire:model.live="deliveryFee" type="number" min="0" step="0.01" placeholder="مثال: 50" class="w-full rounded-lg border border-indigo-600/50 bg-slate-900 px-3 py-2 text-sm font-semibold text-white outline-none focus:border-indigo-400" />
                             <input wire:model.live="customerName" type="text" placeholder="اسم العميل" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                             <input wire:model.live.debounce.400ms="phone" type="text" placeholder="رقم الهاتف" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                             <input wire:model.live="address" type="text" placeholder="العنوان" class="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
@@ -203,10 +220,22 @@
 
                     <div class="space-y-1 rounded-xl border border-slate-800 bg-slate-900 p-3 text-sm">
                         <div class="flex items-center justify-between text-slate-400">
-                            <span>الإجمالي قبل الخصم</span>
+                            <span>مجموع الأصناف</span>
                             <span>{{ number_format($this->subtotal, 2) }} ج.م</span>
                         </div>
-                        <div class="flex items-center justify-between text-base font-extrabold text-white">
+                        @if((float) $discount > 0)
+                            <div class="flex items-center justify-between text-slate-400">
+                                <span>الخصم</span>
+                                <span>− {{ number_format((float) $discount, 2) }} ج.م</span>
+                            </div>
+                        @endif
+                        @if($orderType === 'delivery')
+                            <div class="flex items-center justify-between text-amber-300/90">
+                                <span>رسوم التوصيل</span>
+                                <span>{{ number_format((float) $deliveryFee, 2) }} ج.م</span>
+                            </div>
+                        @endif
+                        <div class="flex items-center justify-between border-t border-slate-700 pt-2 text-base font-extrabold text-white">
                             <span>الإجمالي النهائي</span>
                             <span class="text-emerald-400">{{ number_format($this->finalTotal, 2) }} ج.م</span>
                         </div>
@@ -366,6 +395,17 @@
                 `;
             }).join('');
 
+            const deliveryFee = Number(order.delivery_fee ?? order.deliveryFee ?? 0);
+            const isDelivery = order.order_type === 'delivery';
+            const deliveryRow = isDelivery && deliveryFee > 0
+                ? `<tr class="delivery-fee-row">
+                        <td class="item-name">رسوم التوصيل</td>
+                        <td class="item-center">—</td>
+                        <td class="item-center">—</td>
+                        <td class="item-right">${deliveryFee.toFixed(2)}</td>
+                   </tr>`
+                : '';
+
             const printWindow = window.open('', '_blank', 'width=420,height=900');
             if (!printWindow) return;
 
@@ -391,6 +431,7 @@
                         .item-name { width: 40%; text-align: right; }
                         .item-center { width: 15%; text-align: center; }
                         .item-right { width: 30%; text-align: left; }
+                        .delivery-fee-row td { font-style: italic; color: #333; }
                         .totals div { display: flex; justify-content: space-between; margin: 2px 0; }
                         .totals .final { font-weight: 700; font-size: 13px; }
                     </style>
@@ -422,15 +463,16 @@
                             </thead>
                             <tbody>
                                 ${itemsRows}
+                                ${deliveryRow}
                             </tbody>
                         </table>
 
                         <div class="sep"></div>
                         <div class="totals">
-                            <div><span>المجموع الفرعي</span><span>${Number(order.subtotal ?? 0).toFixed(2)} ج.م</span></div>
+                            <div><span>مجموع الأصناف</span><span>${Number(order.subtotal ?? 0).toFixed(2)} ج.م</span></div>
                             <div><span>الخصم</span><span>${Number(order.discount ?? 0).toFixed(2)} ج.م</span></div>
-                            <div><span>رسوم التوصيل</span><span>${Number(order.delivery_fee ?? 0).toFixed(2)} ج.م</span></div>
-                            <div class="final"><span>الإجمالي</span><span>${Number(order.total ?? 0).toFixed(2)} ج.م</span></div>
+                            ${isDelivery ? `<div><span>رسوم التوصيل</span><span>${deliveryFee.toFixed(2)} ج.م</span></div>` : ''}
+                            <div class="final"><span>الإجمالي المحصل</span><span>${Number(order.total ?? 0).toFixed(2)} ج.م</span></div>
                         </div>
 
                         <div class="sep"></div>

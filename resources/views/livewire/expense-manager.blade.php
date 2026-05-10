@@ -31,15 +31,31 @@
         <div class="mb-6 rounded-3xl border border-indigo-100 bg-white p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-lg font-bold text-indigo-900">تقرير المصروفات اليومية</h2>
-                    <p class="text-sm text-slate-500">تاريخ اليوم: {{ now()->format('Y-m-d') }}</p>
+                    <h2 class="text-lg font-bold text-indigo-900">
+                        @if(isset($activeShift) && $activeShift)
+                            مصروفات الوردية الحالية
+                        @else
+                            تقرير مصروفات اليوم (كل الورديات)
+                        @endif
+                    </h2>
+                    <p class="text-sm text-slate-500">
+                        @if(isset($activeShift) && $activeShift)
+                            وردية مفتوحة منذ {{ optional($activeShift->opened_at)->format('Y-m-d H:i') }}
+                        @else
+                            تاريخ اليوم: {{ now()->format('Y-m-d') }}
+                        @endif
+                    </p>
                 </div>
                 <button onclick="window.print()" class="rounded-xl bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700">
                     طباعة التقرير اليومي
                 </button>
             </div>
             <div class="mt-4 rounded-2xl bg-orange-50 p-4 text-orange-700">
-                إجمالي مصروفات اليوم: <span class="font-black">{{ number_format($todayTotalExpenses ?? 0, 2) }} ج.م</span>
+                @if(isset($activeShift) && $activeShift)
+                    إجمالي مصروفات هذه الوردية: <span class="font-black">{{ number_format($todayTotalExpenses ?? 0, 2) }} ج.م</span>
+                @else
+                    إجمالي مصروفات اليوم: <span class="font-black">{{ number_format($todayTotalExpenses ?? 0, 2) }} ج.م</span>
+                @endif
             </div>
             <div class="mt-3 space-y-2">
                 @forelse($todayExpenses as $expense)
@@ -50,7 +66,11 @@
                     </div>
                 @empty
                     <div class="rounded-xl border border-dashed border-slate-300 px-3 py-5 text-center text-sm text-slate-500">
-                        لا توجد مصروفات مسجلة اليوم.
+                        @if(isset($activeShift) && $activeShift)
+                            لا توجد مصروفات مسجلة في هذه الوردية بعد.
+                        @else
+                            لا توجد مصروفات مسجلة اليوم.
+                        @endif
                     </div>
                 @endforelse
             </div>

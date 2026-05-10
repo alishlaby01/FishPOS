@@ -32,8 +32,8 @@
 
         @if(isset($productsWithoutStock) && $productsWithoutStock->count() > 0)
             <div class="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-4 rounded-2xl">
-                <div class="font-semibold">هناك {{ $productsWithoutStock->count() }} منتج بدون سجل مخزون.</div>
-                <div class="text-sm text-slate-600">يرجى إدخال الكمية الحالية لكل منتج حتى يتم تسجيله في المخزون ويكون متاحًا لاحقًا.</div>
+                <div class="font-semibold">هناك {{ $productsWithoutStock->count() }} منتج بمخزون صفري أو غير محدد (حسب عمود المخزون).</div>
+                <div class="text-sm text-slate-600">يرجى مراجعة الكميات وتسجيل التوريد أو الهالك حسب الحاجة.</div>
             </div>
         @endif
 
@@ -67,13 +67,13 @@
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-slate-800 flex items-center gap-2">
                                         {{ $product->name }}
-                                        @if($product->stockEntries->isEmpty())
-                                            <span class="text-[10px] bg-yellow-100 text-yellow-800 uppercase tracking-[0.12em] px-2 py-1 rounded-full">بدون بيانات</span>
+                                        @if((float)($product->getRawOriginal('current_stock') ?? 0) <= 0)
+                                            <span class="text-[10px] bg-yellow-100 text-yellow-800 uppercase tracking-[0.12em] px-2 py-1 rounded-full">مخزون منخفض</span>
                                         @endif
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="text-slate-600">{{ $product->current_stock ?? 0 }} كيلو</span>
+                                    <span class="text-slate-600">{{ number_format((float)($product->getRawOriginal('current_stock') ?? 0), 2) }} كيلو</span>
                                 </td>
                                 <td class="px-6 py-4 flex justify-center">
                                     <input type="number" step="0.01" wire:model="quantities.{{ $product->id }}"
@@ -116,13 +116,13 @@
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-slate-800 flex items-center gap-2">
                                         {{ $product->name }}
-                                        @if($product->stockEntries->isEmpty())
-                                            <span class="text-[10px] bg-yellow-100 text-yellow-800 uppercase tracking-[0.12em] px-2 py-1 rounded-full">بدون بيانات</span>
+                                        @if((float)($product->getRawOriginal('current_stock') ?? 0) <= 0)
+                                            <span class="text-[10px] bg-yellow-100 text-yellow-800 uppercase tracking-[0.12em] px-2 py-1 rounded-full">مخزون منخفض</span>
                                         @endif
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="text-slate-600">{{ $product->current_stock ?? 0 }} كيلو</span>
+                                    <span class="text-slate-600">{{ number_format((float)($product->getRawOriginal('current_stock') ?? 0), 2) }} كيلو</span>
                                 </td>
                                 <td class="px-6 py-4 flex justify-center">
                                     <input type="number" step="0.01" wire:model="wasteQuantities.{{ $product->id }}"

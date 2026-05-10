@@ -6,6 +6,7 @@ use Livewire\Component;
 use App\Models\Product;
 use App\Models\StockEntry;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class MorningEntry extends Component
 {
@@ -16,9 +17,9 @@ class MorningEntry extends Component
 
     public function render()
     {
-        $products = Product::with('stockEntries')->get(); // تحميل العلاقة لتجنب N+1
+        $products = Product::query()->orderBy('name')->get();
         $productsWithoutStock = $products->filter(function ($product) {
-            return $product->stockEntries->isEmpty();
+            return (float) ($product->getRawOriginal('current_stock') ?? 0) <= 0;
         });
 
         return view('livewire.stock.morning-entry', compact('products', 'productsWithoutStock'))
@@ -39,11 +40,18 @@ class MorningEntry extends Component
 
         try {
             DB::transaction(function () use ($dataToSave) {
+                ksort($dataToSave, SORT_NUMERIC);
                 foreach ($dataToSave as $productId => $newQty) {
-                    $product = Product::find($productId);
-                    if (!$product) continue;
+                    $product = Product::query()
+                        ->whereKey($productId)
+                        ->lockForUpdate()
+                        ->first();
+                    if (!$product) {
+                        continue;
+                    }
 
-                    $currentStock = $product->current_stock ?? 0;
+                    $newQty = (float) $newQty;
+                    $currentStock = (float) ($product->getRawOriginal('current_stock') ?? 0);
                     $diff = $newQty - $currentStock;
 
                     if ($diff != 0) {
@@ -62,9 +70,10 @@ class MorningEntry extends Component
             $this->quantities = [];
             session()->flash('message', 'تم تحديث المخزون بنجاح ✅');
             $this->dispatch('toast', ['message' => 'تم تحديث المخزون بنجاح ✅', 'type' => 'success']);
-        } catch (\Exception $e) {
-            session()->flash('error', 'حدث خطأ أثناء الحفظ: ' . $e->getMessage());
-            $this->dispatch('toast', ['message' => 'حدث خطأ أثناء الحفظ: ' . $e->getMessage(), 'type' => 'error']);
+        } catch (\Throwable $e) {
+            Log::error('MorningEntry::save failed', ['exception' => $e]);
+            session()->flash('error', 'حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.');
+            $this->dispatch('toast', ['message' => 'حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.', 'type' => 'error']);
         }
     }
 
@@ -82,10 +91,17 @@ class MorningEntry extends Component
 
         try {
             DB::transaction(function () use ($dataToSave) {
+                ksort($dataToSave, SORT_NUMERIC);
                 foreach ($dataToSave as $productId => $qty) {
-                    $product = Product::find($productId);
-                    if (!$product) continue;
+                    $product = Product::query()
+                        ->whereKey($productId)
+                        ->lockForUpdate()
+                        ->first();
+                    if (!$product) {
+                        continue;
+                    }
 
+                    $qty = (float) $qty;
                     $reason = $this->wasteReasons[$productId] ?? 'غير محدد';
 
                     StockEntry::create([
@@ -95,7 +111,8 @@ class MorningEntry extends Component
                         'note' => 'هالك: ' . $reason . ' - بتاريخ ' . now()->format('Y-m-d'),
                     ]);
 
-                    $product->update(['current_stock' => max(0, ($product->current_stock ?? 0) - $qty)]);
+                    $currentStock = (float) ($product->getRawOriginal('current_stock') ?? 0);
+                    $product->update(['current_stock' => max(0, $currentStock - $qty)]);
                 }
             });
 
@@ -103,9 +120,10 @@ class MorningEntry extends Component
             $this->wasteReasons = [];
             session()->flash('message', 'تم تسجيل الهالك بنجاح ✅');
             $this->dispatch('toast', ['message' => 'تم تسجيل الهالك بنجاح ✅', 'type' => 'success']);
-        } catch (\Exception $e) {
-            session()->flash('error', 'حدث خطأ أثناء التسجيل: ' . $e->getMessage());
-            $this->dispatch('toast', ['message' => 'حدث خطأ أثناء التسجيل: ' . $e->getMessage(), 'type' => 'error']);
+        } catch (\Throwable $e) {
+            Log::error('MorningEntry::saveWaste failed', ['exception' => $e]);
+            session()->flash('error', 'حدث خطأ أثناء التسجيل، يرجى المحاولة مرة أخرى.');
+            $this->dispatch('toast', ['message' => 'حدث خطأ أثناء التسجيل، يرجى المحاولة مرة أخرى.', 'type' => 'error']);
         }
     }
 }

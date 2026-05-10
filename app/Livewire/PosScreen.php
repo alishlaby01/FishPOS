@@ -2,8 +2,9 @@
 
 namespace App\Livewire;
 
-use App\Models\{Category, Order, Product, StockEntry, Shift, Driver};
-use Illuminate\Support\Facades\{Auth, DB};
+use App\Exceptions\ShiftClosedException;
+use App\Models\{Category, Driver, Order, Product, Shift, StockEntry};
+use Illuminate\Support\Facades\{Auth, DB, Log};
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -46,6 +47,10 @@ class PosScreen extends Component
         $this->loadState($state);
     }
 
+    /**
+     * Toolbar زر «إدارة الوردية» يرسل الحدث openShiftManager؛ مكوّن ShiftManager يستمع عبر #[On('openShiftManager')]
+     * فيفتح المودال مع ملخص الوردية إن وُجدت شفت مفتوحة، أو نموذج الفتح إن لم توجد.
+     */
     private function checkActiveShift(): bool
     {
         $hasShift = Shift::where('user_id', Auth::id())
@@ -248,6 +253,11 @@ public function saveOrder()
         $this->persistState();
     }
 
+    public function updatedDeliveryFee(): void
+    {
+        $this->persistState();
+    }
+
     public function updatedPhone($value): void
     {
         if ($this->orderType !== 'delivery') {
@@ -368,6 +378,80 @@ public function saveOrder()
         session()->flash('success', 'تم حذف الطيار بنجاح.');
     }
 
+    /**
+     * Build order lines from DB prices and quantities in the cart (ignores client-supplied price/total).
+     *
+     * @param  float|null  $deliveryFeeApplied  مبلغ ثابت لرسوم التوصيل عند الدليفري؛ يُمرَّر من الطلب لتفادي أي تعارض مع الحالة.
+     * @return array{items: list<array{product_id: int, name: string, price: float, qty: float, total: float, product_type: string}>, subtotal: float, total: float}|null
+     */
+    private function resolveCartLineItemsForOrder(?float $deliveryFeeApplied = null): ?array
+    {
+        $productIds = collect($this->cart)
+            ->pluck('product_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (count($productIds) !== count($this->cart)) {
+            $this->addError('order', 'بيانات السلة غير صالحة.');
+            return null;
+        }
+
+        $products = Product::query()
+            ->whereIn('id', $productIds)
+            ->where('active', true)
+            ->get()
+            ->keyBy('id');
+
+        $items = [];
+        foreach ($this->cart as $row) {
+            $productId = (int) ($row['product_id'] ?? 0);
+            if ($productId <= 0) {
+                $this->addError('order', 'بيانات السلة غير صالحة.');
+                return null;
+            }
+
+            $qty = (float) ($row['qty'] ?? 0);
+            if ($qty <= 0) {
+                $this->addError('order', 'الكمية يجب أن تكون أكبر من صفر.');
+                return null;
+            }
+
+            $product = $products->get($productId);
+            if (!$product) {
+                $this->addError('order', 'منتج غير متوفر أو تم إيقافه.');
+                return null;
+            }
+
+            $unitPrice = (float) $product->price;
+            $lineTotal = $unitPrice * $qty;
+
+            $items[] = [
+                'product_id'   => $product->id,
+                'name'         => $product->name,
+                'price'        => $unitPrice,
+                'qty'          => $qty,
+                'total'        => $lineTotal,
+                'product_type' => $product->product_type,
+            ];
+        }
+
+        $subtotal = (float) collect($items)->sum('total');
+        $discount = (float) $this->discount;
+        $deliveryFee = $deliveryFeeApplied !== null
+            ? max(0, (float) $deliveryFeeApplied)
+            : ($this->orderType === 'delivery' ? max(0, (float) $this->deliveryFee) : 0);
+        $total = max(0, $subtotal - $discount + $deliveryFee);
+
+        return [
+            'items'    => $items,
+            'subtotal' => $subtotal,
+            'total'    => $total,
+        ];
+    }
+
     private function storeOrder(bool $print)
     {
         $this->validate([
@@ -399,8 +483,27 @@ public function saveOrder()
             return;
         }
 
+        $deliveryFeeForOrder = $this->orderType === 'delivery'
+            ? max(0, (float) $this->deliveryFee)
+            : 0;
+
+        $resolved = $this->resolveCartLineItemsForOrder($deliveryFeeForOrder);
+        if ($resolved === null) {
+            return;
+        }
+
         try {
-            $order = DB::transaction(function () use ($activeShift) {
+            $order = DB::transaction(function () use ($activeShift, $resolved, $deliveryFeeForOrder) {
+                $shift = Shift::query()
+                    ->whereKey($activeShift->id)
+                    ->whereNull('closed_at')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$shift) {
+                    throw new ShiftClosedException();
+                }
+
                 // إنشاء الطلب
                 $order = Order::create([
                     'invoice_number'    => 'TMP-' . Str::uuid(),
@@ -408,13 +511,13 @@ public function saveOrder()
                     'customer_name'     => $this->customerName,
                     'phone'             => $this->phone,
                     'address'           => $this->address,
-                    'subtotal'          => $this->subtotal(),
+                    'subtotal'          => $resolved['subtotal'],
                     'discount'          => $this->discount,
-                    'delivery_fee'      => $this->deliveryFee,
-                    'total'             => $this->finalTotal(),
+                    'delivery_fee'      => $deliveryFeeForOrder,
+                    'total'             => $resolved['total'],
                     'status'            => 'completed',
                     'created_by'        => Auth::id(),
-                    'shift_id'          => $activeShift->id,
+                    'shift_id'          => $shift->id,
                     'driver_id'         => $this->orderType === 'delivery' ? $this->driverId : null,
                     'driver_commission' => $this->orderType === 'delivery' ? $this->driverCommission : 0,
                 ]);
@@ -423,10 +526,21 @@ public function saveOrder()
                 $order->update(['invoice_number' => $this->generateInvoiceNo($order->id)]);
 
                 // تحديث كاش الوردية
-                $activeShift->increment('expected_cash', $order->total);
+                $shift->increment('expected_cash', $order->total);
 
-                // بنود الطلب وحركات المخزن
-                foreach ($this->cart as $item) {
+                // بنود الطلب وحركات المخزن (أسعار وإجماليات من الخادم + قفل المنتج لتحديث المخزون)
+                $itemsForStock = collect($resolved['items'])->sortBy('product_id')->values()->all();
+                foreach ($itemsForStock as $item) {
+                    $product = Product::query()
+                        ->whereKey($item['product_id'])
+                        ->where('active', true)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$product) {
+                        throw new \RuntimeException('Product unavailable');
+                    }
+
                     $order->orderItems()->create([
                         'product_id' => $item['product_id'],
                         'quantity'   => $item['qty'],
@@ -439,6 +553,11 @@ public function saveOrder()
                         'quantity'   => $item['qty'],
                         'type'       => 'out',
                         'note'       => "بيع فاتورة: {$order->invoice_number}",
+                    ]);
+
+                    $currentStock = (float) ($product->getRawOriginal('current_stock') ?? 0);
+                    $product->update([
+                        'current_stock' => max(0, $currentStock - (float) $item['qty']),
                     ]);
                 }
 
@@ -453,19 +572,24 @@ public function saveOrder()
                     'customer_name'  => $order->customer_name,
                     'phone'          => $order->phone,
                     'address'        => $order->address,
-                    'total'          => $order->total,
-                    'discount'       => $order->discount,
-                    'delivery_fee'   => $order->delivery_fee,
-                    'subtotal'       => $order->subtotal,
-                    'items'          => array_values($this->cart),
+                    'total'          => $resolved['total'],
+                    'discount'       => (float) $this->discount,
+                    'delivery_fee'   => $deliveryFeeForOrder,
+                    'subtotal'       => $resolved['subtotal'],
+                    'items'          => $resolved['items'],
                 ]);
             }
 
             $this->resetForm();
             session()->flash('success', 'تم تسجيل الطلب بنجاح ✅');
 
-        } catch (\Exception $e) {
-            $this->addError('order', 'خطأ في الحفظ: ' . $e->getMessage());
+        } catch (ShiftClosedException $e) {
+            Log::warning('PosScreen::storeOrder shift closed during transaction', ['exception' => $e]);
+            $this->dispatch('toast', ['message' => 'تم إغلاق الوردية ولا يمكن إتمام البيع.', 'type' => 'error']);
+        } catch (\Throwable $e) {
+            Log::error('PosScreen::storeOrder failed', ['exception' => $e]);
+            $this->dispatch('toast', ['message' => 'تعذر إتمام الطلب، يرجى المحاولة مرة أخرى.', 'type' => 'error']);
+            $this->addError('order', 'تعذر إتمام الطلب، يرجى المحاولة مرة أخرى.');
         }
     }
 

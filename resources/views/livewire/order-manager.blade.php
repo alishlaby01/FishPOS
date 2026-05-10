@@ -6,6 +6,16 @@
         </button>
     </div>
 
+    @if(isset($activeShift) && $activeShift)
+        <div class="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-100">
+            يتم عرض طلبات <strong>الوردية الحالية المفتوحة</strong> فقط (يمكنك إغلاق الوردية لفتح نطاق أوسع إذا كنت مالكاً وتعمل بدون شفت).
+        </div>
+    @elseif(auth()->user()?->role === 'cashier')
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+            لا توجد وردية مفتوحة — افتح وردية من لوحة الكاشير أو شاشة البيع لعرض الطلبات هنا.
+        </div>
+    @endif
+
     <!-- فلاتر البحث -->
     <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-6">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -39,6 +49,7 @@
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">رقم الفاتورة</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">التاريخ</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الحالة</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">التوصيل</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الإجمالي</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الكاشير</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">الإجراءات</th>
@@ -67,6 +78,9 @@
                                 @default {{ $order->status }} @endswitch
                         </span>
                     </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-200">
+                        {{ number_format((float) $order->delivery_fee, 2) }}
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                         {{ number_format($order->total, 2) }} جنيه مصري
                     </td>
@@ -80,17 +94,31 @@
                         <button wire:click="viewOrder({{ $order->id }})" class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300">
                             👁️ عرض
                         </button>
+                        @auth
+                            @if(auth()->user()->role === 'owner' && $order->status !== 'cancelled')
+                                <button type="button"
+                                    wire:click="cancelOrder({{ $order->id }})"
+                                    wire:confirm="هل أنت متأكد من إلغاء هذا الطلب؟ لا يمكن التراجع عن الإلغاء من الواجهة."
+                                    class="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 mr-3">
+                                    إلغاء
+                                </button>
+                            @endif
+                        @endauth
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                    <td colspan="7" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                         لا توجد طلبات
                     </td>
                 </tr>
                 @endforelse
             </tbody>
         </table>
+    </div>
+
+    <div class="mt-4">
+        {{ $orders->links() }}
     </div>
 
     <!-- Modal لعرض تفاصيل الطلب -->
@@ -116,7 +144,18 @@
                             <strong>الكاشير:</strong> {{ $selectedOrder->creator->name ?? 'غير معروف' }}
                         </div>
                         <div>
-                            <strong>الإجمالي:</strong> {{ number_format($selectedOrder->total, 2) }} جنيه مصري
+                            <strong>مجموع الأصناف:</strong> {{ number_format((float) $selectedOrder->subtotal, 2) }} جنيه مصري
+                        </div>
+                        <div>
+                            <strong>الخصم:</strong> {{ number_format((float) $selectedOrder->discount, 2) }} جنيه مصري
+                        </div>
+                        @if($selectedOrder->order_type === 'delivery')
+                            <div>
+                                <strong>رسوم التوصيل:</strong> {{ number_format((float) $selectedOrder->delivery_fee, 2) }} جنيه مصري
+                            </div>
+                        @endif
+                        <div>
+                            <strong>الإجمالي المحصل:</strong> {{ number_format($selectedOrder->total, 2) }} جنيه مصري
                         </div>
                     </div>
                     <div>
@@ -139,6 +178,12 @@
                                     <td class="border px-4 py-2">{{ number_format($item->total, 2) }}</td>
                                 </tr>
                                 @endforeach
+                                @if((float) $selectedOrder->delivery_fee > 0)
+                                <tr class="bg-amber-50 dark:bg-amber-900/20">
+                                    <td class="border px-4 py-2 font-medium" colspan="3">رسوم التوصيل</td>
+                                    <td class="border px-4 py-2 font-semibold">{{ number_format((float) $selectedOrder->delivery_fee, 2) }}</td>
+                                </tr>
+                                @endif
                             </tbody>
                         </table>
                     </div>
@@ -151,10 +196,34 @@
 
 <script>
 $wire.on('print-order', (data) => {
-    // طباعة الطلب كـ PDF
     const order = data.order;
+    const items = order.order_items || order.orderItems || [];
+    const deliveryFee = Number(order.delivery_fee ?? order.deliveryFee ?? 0);
+    const isDelivery = order.order_type === 'delivery';
+    const subtotal = Number(order.subtotal ?? 0);
+    const discount = Number(order.discount ?? 0);
+    let rows = '';
+    items.forEach(item => {
+        const pname = item.product?.name ?? '—';
+        rows += `
+            <tr>
+                <td style="border: 1px solid #ccc; padding: 8px;">${pname}</td>
+                <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${item.quantity}</td>
+                <td style="border: 1px solid #ccc; padding: 8px; text-align: right;">${Number(item.total ?? 0).toFixed(2)} ج.م</td>
+            </tr>
+        `;
+    });
+    if (isDelivery && deliveryFee > 0) {
+        rows += `
+            <tr style="font-style: italic;">
+                <td style="border: 1px solid #ccc; padding: 8px;" colspan="2">رسوم التوصيل</td>
+                <td style="border: 1px solid #ccc; padding: 8px; text-align: right;">${deliveryFee.toFixed(2)} ج.م</td>
+            </tr>
+        `;
+    }
+
     let content = `
-        <div style="font-family: Arial, sans-serif; max-width: 300px; margin: 0 auto; padding: 20px; background: white; color: black;">
+        <div style="font-family: Arial, sans-serif; max-width: 320px; margin: 0 auto; padding: 20px; background: white; color: black;" dir="rtl">
             <h2 style="text-align: center; margin-bottom: 20px;">فاتورة الطلب</h2>
             <p><strong>رقم الفاتورة:</strong> ${order.invoice_number}</p>
             <p><strong>التاريخ:</strong> ${new Date(order.created_at).toLocaleString('ar-EG')}</p>
@@ -163,29 +232,18 @@ $wire.on('print-order', (data) => {
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>
                     <tr>
-                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">المنتج</th>
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: right;">المنتج</th>
                         <th style="border: 1px solid #ccc; padding: 8px; text-align: center;">الكمية</th>
-                        <th style="border: 1px solid #ccc; padding: 8px; text-align: right;">الإجمالي</th>
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">الإجمالي</th>
                     </tr>
                 </thead>
-                <tbody>
-    `;
-
-    order.order_items.forEach(item => {
-        content += `
-            <tr>
-                <td style="border: 1px solid #ccc; padding: 8px;">${item.product.name}</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${item.quantity}</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align: right;">${item.total.toFixed(2)} ريال</td>
-            </tr>
-        `;
-    });
-
-    content += `
-                </tbody>
+                <tbody>${rows}</tbody>
             </table>
             <hr style="margin: 20px 0;">
-            <p style="text-align: right; font-size: 18px; font-weight: bold;">الإجمالي: ${order.total.toFixed(2)} جنيه مصري</p>
+            <p style="display:flex; justify-content: space-between;"><span>مجموع الأصناف</span><span>${subtotal.toFixed(2)} ج.م</span></p>
+            <p style="display:flex; justify-content: space-between;"><span>الخصم</span><span>${discount.toFixed(2)} ج.م</span></p>
+            ${isDelivery ? `<p style="display:flex; justify-content: space-between;"><span>رسوم التوصيل</span><span>${deliveryFee.toFixed(2)} ج.م</span></p>` : ''}
+            <p style="text-align: center; font-size: 18px; font-weight: bold; margin-top: 12px;">الإجمالي المحصل: ${Number(order.total ?? 0).toFixed(2)} ج.م</p>
         </div>
     `;
 
@@ -196,11 +254,13 @@ $wire.on('print-order', (data) => {
 });
 
 $wire.on('print-daily-report', (data) => {
+    const scopedNote = data.scoped_to_shift ? '<p style="text-align:center;color:#555;margin-bottom:16px;">(طلبات الوردية الحالية فقط)</p>' : '';
     let content = `
-        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: white; color: black;">
-            <h1 style="text-align: center; margin-bottom: 30px;">التقرير اليومي - ${data.date}</h1>
+        <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: white; color: black;" dir="rtl">
+            <h1 style="text-align: center; margin-bottom: 12px;">التقرير اليومي - ${data.date}</h1>
+            ${scopedNote}
             <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                <p><strong>إجمالي المبيعات:</strong> ${data.totalSales.toFixed(2)} جنيه مصري</p>
+                <p><strong>إجمالي المبيعات:</strong> ${Number(data.totalSales).toFixed(2)} ج.م</p>
                 <p><strong>عدد الطلبات:</strong> ${data.totalOrders}</p>
             </div>
             <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">

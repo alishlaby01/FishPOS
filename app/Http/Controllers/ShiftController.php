@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Shift;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ShiftController extends Controller
 {
@@ -14,22 +15,29 @@ class ShiftController extends Controller
             'opening_balance' => 'required|numeric|min:0',
         ]);
 
-        // التحقق من عدم وجود وردية مفتوحة
-        $existingShift = Shift::where('user_id', auth()->id())
-            ->whereNull('closed_at')
-            ->first();
+        try {
+            // التحقق من عدم وجود وردية مفتوحة
+            $existingShift = Shift::where('user_id', auth()->id())
+                ->whereNull('closed_at')
+                ->first();
 
-        if ($existingShift) {
-            return redirect()->back()->withErrors(['shift' => 'لديك وردية مفتوحة بالفعل']);
+            if ($existingShift) {
+                return redirect()->back()->withErrors(['shift' => 'لديك وردية مفتوحة بالفعل']);
+            }
+
+            Shift::create([
+                'user_id' => auth()->id(),
+                'opened_at' => now(),
+                'opening_cash' => $request->opening_balance,
+                'expected_cash' => $request->opening_balance,
+            ]);
+
+            return redirect()->back()->with('success', 'تم فتح الوردية بنجاح! ✅');
+        } catch (\Throwable $e) {
+            Log::error('ShiftController::open failed', ['exception' => $e]);
+
+            return redirect()->back()->withErrors(['shift' => 'تعذر فتح الوردية، يرجى المحاولة مرة أخرى.']);
         }
-
-        Shift::create([
-            'user_id' => auth()->id(),
-            'opened_at' => now(),
-            'opening_cash' => $request->opening_balance,
-        ]);
-
-        return redirect()->back()->with('success', 'تم فتح الوردية بنجاح! ✅');
     }
 
     public function close(Shift $shift): RedirectResponse
@@ -44,17 +52,24 @@ class ShiftController extends Controller
             return redirect()->back()->withErrors(['shift' => 'الوردية مغلقة بالفعل']);
         }
 
-        // حساب إجمالي المبيعات والمصروفات
-        $totalSales = $shift->orders()->sum('total');
-        $totalExpenses = $shift->expenses()->sum('amount');
+        try {
+            // نفس منطق ShiftManager: مبيعات الطلبات المكتملة فقط
+            $ordersQuery = $shift->orders()->where('status', 'completed');
+            $totalSales = (float) (clone $ordersQuery)->sum('total');
+            $totalExpenses = (float) $shift->expenses()->sum('amount');
 
-        $shift->update([
-            'closed_at' => now(),
-            'expected_cash' => $shift->opening_cash + $totalSales - $totalExpenses,
-            'total_sales' => $totalSales,
-            'total_expenses' => $totalExpenses,
-        ]);
+            $shift->update([
+                'closed_at' => now(),
+                'expected_cash' => $shift->opening_cash + $totalSales - $totalExpenses,
+                'total_sales' => $totalSales,
+                'total_expenses' => $totalExpenses,
+            ]);
 
-        return redirect()->back()->with('success', 'تم إغلاق الوردية بنجاح! ✅');
+            return redirect()->back()->with('success', 'تم إغلاق الوردية بنجاح! ✅');
+        } catch (\Throwable $e) {
+            Log::error('ShiftController::close failed', ['exception' => $e]);
+
+            return redirect()->back()->withErrors(['shift' => 'تعذر إغلاق الوردية، يرجى المحاولة مرة أخرى.']);
+        }
     }
 }

@@ -38,7 +38,7 @@ class ProductManager extends Component
     public function mount()
     {
         // التحقق من أن المستخدم هو OWNER
-        if (Auth::user()->role !== 'owner') {
+        if (Auth::user()?->role !== 'owner') {
             abort(403, 'غير مصرح لك بالوصول إلى هذه الصفحة');
         }
     }
@@ -134,6 +134,10 @@ class ProductManager extends Component
 
     public function forceDeleteProduct($productId)
     {
+        if (Auth::user()?->role !== 'owner') {
+            abort(403);
+        }
+
         $product = Product::withTrashed()->findOrFail($productId);
         $product->forceDelete(); // Hard delete
         session()->flash('message', 'تم حذف المنتج نهائياً.');
@@ -141,6 +145,10 @@ class ProductManager extends Component
 
     public function restoreProduct($productId)
     {
+        if (Auth::user()?->role !== 'owner') {
+            abort(403);
+        }
+
         $product = Product::withTrashed()->findOrFail($productId);
         $product->restore();
         session()->flash('message', 'تم استعادة المنتج.');
@@ -148,6 +156,10 @@ class ProductManager extends Component
 
     public function toggleActive($productId)
     {
+        if (Auth::user()?->role !== 'owner') {
+            abort(403);
+        }
+
         $product = Product::findOrFail($productId);
         $product->update(['active' => !$product->active]);
         session()->flash('message', 'تم تحديث حالة المنتج.');

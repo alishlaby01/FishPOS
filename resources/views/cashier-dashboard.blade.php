@@ -103,17 +103,27 @@
                 <!-- إحصائيات الوردية -->
                 <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                     <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">إحصائيات الوردية الحالية</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                         @php
-                            $shiftOrders = \App\Models\Order::where('shift_id', $activeShift->id)->get();
+                            $shiftOrders = \App\Models\Order::where('shift_id', $activeShift->id)->where('status', 'completed')->get();
                             $shiftSales = $shiftOrders->sum('total');
+                            $shiftGoodsNet = $shiftOrders->sum(fn ($o) => (float) $o->subtotal - (float) $o->discount);
+                            $shiftDeliveryFees = $shiftOrders->sum('delivery_fee');
                             $shiftOrderCount = $shiftOrders->count();
                             $shiftExpenses = \App\Models\Expense::where('shift_id', $activeShift->id)->sum('amount');
                         @endphp
 
                         <div class="text-center">
                             <div class="text-2xl font-bold text-green-600">{{ number_format($shiftSales, 2) }}</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">مبيعات الوردية (ريال)</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">إجمالي المحصل</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xl font-bold text-slate-700 dark:text-slate-200">{{ number_format($shiftGoodsNet, 2) }}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">صافي البضاعة</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-xl font-bold text-amber-600">{{ number_format($shiftDeliveryFees, 2) }}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">رسوم التوصيل</div>
                         </div>
                         <div class="text-center">
                             <div class="text-2xl font-bold text-blue-600">{{ $shiftOrderCount }}</div>
@@ -121,11 +131,11 @@
                         </div>
                         <div class="text-center">
                             <div class="text-2xl font-bold text-red-600">{{ number_format($shiftExpenses, 2) }}</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">المصروفات (ريال)</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">مصروفات الوردية</div>
                         </div>
                         <div class="text-center">
                             <div class="text-2xl font-bold text-purple-600">{{ number_format($shiftSales - $shiftExpenses, 2) }}</div>
-                            <div class="text-sm text-gray-600 dark:text-gray-400">صافي الوردية (ريال)</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">صافي الوردية</div>
                         </div>
                     </div>
                 </div>

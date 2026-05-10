@@ -2,9 +2,12 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use App\Models\Shift;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\On;
+use Livewire\Component;
 
 class ShiftManager extends Component
 {
@@ -14,16 +17,13 @@ class ShiftManager extends Component
     public $activeShift;
     public array $shiftSummary = [];
 
-    protected $listeners = [
-        'openShiftManager' => 'openModal',
-    ];
-
     public function mount()
     {
         $this->checkActiveShift();
     }
 
-    public function openModal()
+    #[On('openShiftManager')]
+    public function openModal(): void
     {
         $this->checkActiveShift();
         $this->showModal = true;
@@ -57,16 +57,41 @@ class ShiftManager extends Component
             'opening_cash.min' => 'رصيد الافتتاح يجب أن يكون أكبر من صفر.',
         ]);
 
-        $this->activeShift = Shift::create([
-            'user_id' => Auth::id(),
-            'opened_at' => now(),
-            'opening_cash' => $this->opening_cash,
-            'expected_cash' => $this->opening_cash,
-        ]);
+        try {
+            $created = DB::transaction(function () {
+                // وردية مفتوحة = closed_at فارغ
+                $hasOpenShift = Shift::query()
+                    ->where('user_id', Auth::id())
+                    ->whereNull('closed_at')
+                    ->lockForUpdate()
+                    ->exists();
 
-        session()->flash('message', 'تم فتح الوردية بنجاح.');
-        $this->showModal = false;
-        $this->opening_cash = 0;
+                if ($hasOpenShift) {
+                    return null;
+                }
+
+                return Shift::create([
+                    'user_id' => Auth::id(),
+                    'opened_at' => now(),
+                    'opening_cash' => $this->opening_cash,
+                    'expected_cash' => $this->opening_cash,
+                ]);
+            });
+
+            if ($created === null) {
+                $this->dispatch('toast', ['message' => 'لديك وردية مفتوحة بالفعل', 'type' => 'error']);
+                $this->checkActiveShift();
+                return;
+            }
+
+            $this->activeShift = $created;
+            session()->flash('message', 'تم فتح الوردية بنجاح.');
+            $this->showModal = false;
+            $this->opening_cash = 0;
+        } catch (\Throwable $e) {
+            Log::error('ShiftManager::openShift failed', ['exception' => $e]);
+            $this->dispatch('toast', ['message' => 'تعذر فتح الوردية، يرجى المحاولة مرة أخرى.', 'type' => 'error']);
+        }
     }
 
     public function closeShift()
@@ -82,23 +107,56 @@ class ShiftManager extends Component
             'actual_cash.numeric' => 'الرصيد الفعلي يجب أن يكون رقمًا.',
         ]);
 
-        $this->loadShiftSummary();
-        $totalSales = $this->shiftSummary['total_sales'];
-        $totalExpenses = $this->shiftSummary['total_expenses'];
-        $expected = ($this->activeShift->opening_cash + $totalSales) - $totalExpenses;
+        try {
+            $shiftId = $this->activeShift->id;
 
-        $this->activeShift->update([
-            'closed_at' => now(),
-            'expected_cash' => $expected,
-            'actual_cash' => $this->actual_cash,
-            'discrepancy' => $this->actual_cash - $expected,
-            'total_sales' => $totalSales,
-            'total_expenses' => $totalExpenses,
-        ]);
+            DB::transaction(function () use ($shiftId) {
+                $this->loadShiftSummary();
+                $totalSales = $this->shiftSummary['total_sales'];
+                $totalExpenses = $this->shiftSummary['total_expenses'];
 
-        session()->flash('message', 'تم تقفيل الوردية بنجاح.');
-        $this->showModal = false;
-        $this->actual_cash = 0;
+                $shift = Shift::query()
+                    ->whereKey($shiftId)
+                    ->where('user_id', Auth::id())
+                    ->whereNull('closed_at')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$shift) {
+                    throw new \RuntimeException('Shift already closed or not found.');
+                }
+
+                $expected = ($shift->opening_cash + $totalSales) - $totalExpenses;
+
+                $shift->update([
+                    'closed_at' => now(),
+                    'expected_cash' => $expected,
+                    'actual_cash' => $this->actual_cash,
+                    'discrepancy' => $this->actual_cash - $expected,
+                    'total_sales' => $totalSales,
+                    'total_expenses' => $totalExpenses,
+                ]);
+            });
+
+            $this->dispatch('toast', ['message' => 'تم تقفيل الوردية بنجاح.', 'type' => 'success']);
+
+            $this->showModal = false;
+            $this->actual_cash = 0;
+            $this->checkActiveShift();
+
+            $landingRoute = match (Auth::user()?->role) {
+                'cashier' => 'cashier-dashboard',
+                'owner' => 'owner-dashboard',
+                default => 'home',
+            };
+
+            session()->flash('success', 'تم تقفيل الوردية بنجاح.');
+
+            return $this->redirect(route($landingRoute), navigate: false);
+        } catch (\Throwable $e) {
+            Log::error('ShiftManager::closeShift failed', ['exception' => $e]);
+            $this->dispatch('toast', ['message' => 'تعذر إغلاق الوردية، يرجى المحاولة مرة أخرى.', 'type' => 'error']);
+        }
     }
 
     private function loadShiftSummary(): void
@@ -110,6 +168,8 @@ class ShiftManager extends Component
 
         $ordersQuery = $this->activeShift->orders()->where('status', 'completed');
         $totalSales = (float) (clone $ordersQuery)->sum('total');
+        $goodsNetSales = (float) (clone $ordersQuery)->sum(DB::raw('subtotal - COALESCE(discount, 0)'));
+        $deliveryFeesTotal = (float) (clone $ordersQuery)->sum('delivery_fee');
         $totalOrders = (int) (clone $ordersQuery)->count();
         $deliveryOrders = (int) (clone $ordersQuery)->where('order_type', 'delivery')->count();
         $takeawayOrders = (int) (clone $ordersQuery)->where('order_type', 'takeaway')->count();
@@ -119,6 +179,8 @@ class ShiftManager extends Component
 
         $this->shiftSummary = [
             'total_sales' => $totalSales,
+            'goods_net_sales' => $goodsNetSales,
+            'delivery_fees_total' => $deliveryFeesTotal,
             'total_orders' => $totalOrders,
             'delivery_orders' => $deliveryOrders,
             'takeaway_orders' => $takeawayOrders,

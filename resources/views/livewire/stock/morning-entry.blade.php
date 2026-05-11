@@ -1,11 +1,11 @@
 {{-- resources/views/livewire/stock/morning-entry.blade.php --}}
-<div class="min-h-screen bg-[#F4F7FE] font-sans p-8">
+<div class="min-h-full bg-[#F4F7FE] font-sans p-8 pb-28">
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
         <div class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-3xl font-bold text-[#1E1B4B]">إدارة المخزون</h1>
-                <p class="text-slate-500 mt-2">إدخال المخزون الصباحي وتسجيل الهالك</p>
+                <p class="text-slate-500 mt-2">إدخال المخزون الصباحي (التوريد)</p>
             </div>
             <div class="flex gap-4">
                 <a href="{{ route('cashier') }}" class="bg-slate-600 hover:bg-slate-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition">
@@ -32,27 +32,14 @@
 
         @if(isset($productsWithoutStock) && $productsWithoutStock->count() > 0)
             <div class="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-4 rounded-2xl">
-                <div class="font-semibold">هناك {{ $productsWithoutStock->count() }} منتج بمخزون صفري أو غير محدد (حسب عمود المخزون).</div>
-                <div class="text-sm text-slate-600">يرجى مراجعة الكميات وتسجيل التوريد أو الهالك حسب الحاجة.</div>
+                <div class="font-semibold">هناك {{ $productsWithoutStock->count() }} منتج بمخزون صفري أو غير محدد.</div>
+                <div class="text-sm text-slate-600">يرجى مراجعة الكميات وتسجيل التوريد الصباحي حسب الحاجة.</div>
             </div>
         @endif
 
-        <!-- تبويبات -->
-        <div class="flex mb-6 bg-slate-100 rounded-full p-1">
-            <button wire:click="$set('activeTab', 'supply')"
-                    class="flex-1 py-3 px-6 rounded-full font-bold transition-all {{ $activeTab == 'supply' ? 'bg-[#5B45FF] text-white' : 'text-slate-600 hover:text-slate-800' }}">
-                توريد صباحي
-            </button>
-            <button wire:click="$set('activeTab', 'waste')"
-                    class="flex-1 py-3 px-6 rounded-full font-bold transition-all {{ $activeTab == 'waste' ? 'bg-[#5B45FF] text-white' : 'text-slate-600 hover:text-slate-800' }}">
-                تسجيل هالك
-            </button>
-        </div>
-
-        @if($activeTab == 'supply')
-        <!-- قسم التوريد -->
-        <div class="bg-white rounded-3xl shadow-xl overflow-hidden">
-            <div class="overflow-x-auto overflow-y-auto max-h-[65vh]">
+        <!-- التوريد الصباحي -->
+        <div class="bg-white rounded-3xl shadow-xl overflow-hidden flex flex-col max-h-[calc(100vh-14rem)] min-h-0">
+            <div class="overflow-x-auto overflow-y-auto min-h-0 flex-1">
                 <table class="w-full table-fixed">
                     <thead class="bg-slate-50 sticky top-0 z-10">
                         <tr>
@@ -64,20 +51,20 @@
                     <tbody class="divide-y divide-slate-200">
                         @forelse($products as $product)
                             <tr class="hover:bg-slate-50">
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-4 align-middle">
                                     <div class="font-bold text-slate-800 flex items-center gap-2">
                                         {{ $product->name }}
-                                        @if((float)($product->getRawOriginal('current_stock') ?? 0) <= 0)
+                                        @if($product->displayStock() <= 0)
                                             <span class="text-[10px] bg-yellow-100 text-yellow-800 uppercase tracking-[0.12em] px-2 py-1 rounded-full">مخزون منخفض</span>
                                         @endif
                                     </div>
                                 </td>
-                                <td class="px-6 py-4">
-                                    <span class="text-slate-600">{{ number_format((float)($product->getRawOriginal('current_stock') ?? 0), 2) }} كيلو</span>
+                                <td class="px-6 py-4 align-middle">
+                                    <span class="text-slate-600">{{ number_format($product->displayStock(), 2) }} كيلو</span>
                                 </td>
-                                <td class="px-6 py-4 flex justify-center">
+                                <td class="px-6 py-4 align-middle text-center">
                                     <input type="number" step="0.01" wire:model="quantities.{{ $product->id }}"
-                                           class="bg-slate-100 border border-slate-300 rounded-2xl w-32 text-center px-3 py-2 focus:border-indigo-500 outline-none">
+                                           class="inline-block bg-slate-100 border border-slate-300 rounded-2xl w-32 text-center px-3 py-2 focus:border-indigo-500 outline-none">
                                 </td>
                             </tr>
                         @empty
@@ -90,72 +77,14 @@
                     </tbody>
                 </table>
             </div>
-        </div>
 
-        <div class="mt-8 flex justify-end">
-            <button wire:click="save" class="bg-[#5B45FF] hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold transition">
-                حفظ الكميات
-            </button>
-        </div>
-        @else
-        <!-- قسم الهالك -->
-        <div class="bg-white rounded-3xl shadow-xl overflow-hidden">
-            <div class="overflow-x-auto overflow-y-auto max-h-[65vh]">
-                <table class="w-full table-fixed">
-                    <thead class="bg-slate-50 sticky top-0 z-10">
-                        <tr>
-                            <th class="px-6 py-4 text-right text-sm font-bold text-slate-600">المنتج</th>
-                            <th class="px-6 py-4 text-right text-sm font-bold text-slate-600">الكمية الحالية</th>
-                            <th class="px-6 py-4 text-center text-sm font-bold text-slate-600">كمية الهالك (كيلو)</th>
-                            <th class="px-6 py-4 text-center text-sm font-bold text-slate-600">السبب</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-200">
-                        @forelse($products as $product)
-                            <tr class="hover:bg-slate-50">
-                                <td class="px-6 py-4">
-                                    <div class="font-bold text-slate-800 flex items-center gap-2">
-                                        {{ $product->name }}
-                                        @if((float)($product->getRawOriginal('current_stock') ?? 0) <= 0)
-                                            <span class="text-[10px] bg-yellow-100 text-yellow-800 uppercase tracking-[0.12em] px-2 py-1 rounded-full">مخزون منخفض</span>
-                                        @endif
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span class="text-slate-600">{{ number_format((float)($product->getRawOriginal('current_stock') ?? 0), 2) }} كيلو</span>
-                                </td>
-                                <td class="px-6 py-4 flex justify-center">
-                                    <input type="number" step="0.01" wire:model="wasteQuantities.{{ $product->id }}"
-                                           class="bg-slate-100 border border-slate-300 rounded-2xl w-32 text-center px-3 py-2 focus:border-indigo-500 outline-none">
-                                </td>
-                                <td class="px-6 py-4 flex justify-center">
-                                    <select wire:model="wasteReasons.{{ $product->id }}"
-                                            class="bg-slate-100 border border-slate-300 rounded-2xl px-3 py-2 focus:border-indigo-500 outline-none">
-                                        <option value="">اختر السبب</option>
-                                        <option value="تلف">تلف</option>
-                                        <option value="تنظيف">تنظيف</option>
-                                        <option value="انتهاء الصلاحية">انتهاء الصلاحية</option>
-                                        <option value="أخرى">أخرى</option>
-                                    </select>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="px-6 py-12 text-center text-slate-500">
-                                    لا توجد منتجات
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+            <div class="flex-shrink-0 border-t border-slate-200 bg-slate-50 px-6 py-4 flex justify-end gap-3">
+                <button type="button" wire:click="save" wire:loading.attr="disabled" wire:target="save"
+                    class="bg-[#5B45FF] hover:bg-indigo-700 text-white px-8 py-3 rounded-2xl font-bold transition shadow-sm">
+                    <span wire:loading.remove wire:target="save">حفظ الكميات</span>
+                    <span wire:loading wire:target="save">جاري الحفظ…</span>
+                </button>
             </div>
         </div>
-
-        <div class="mt-8 flex justify-end">
-            <button wire:click="saveWaste" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-2xl font-bold transition">
-                تسجيل الهالك
-            </button>
-        </div>
-        @endif
     </div>
 </div>

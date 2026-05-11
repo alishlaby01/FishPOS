@@ -24,8 +24,10 @@
         }
     </style>
 </head>
-<body class="bg-surface text-on-surface font-cairo overflow-hidden h-screen flex flex-col">
-    {{ $slot }}
+<body class="bg-surface text-on-surface font-cairo h-screen flex flex-col overflow-hidden">
+    <div class="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        {{ $slot }}
+    </div>
 
     <!-- Toast Notifications -->
     @include('components.toast')

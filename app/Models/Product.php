@@ -19,7 +19,6 @@ class Product extends Model
         'category_id',
         'name',
         'price',
-        'purchase_price',
         'current_stock',
         'min_stock',
         'unit',
@@ -32,7 +31,6 @@ class Product extends Model
      */
     protected $casts = [
         'price' => 'decimal:2',
-        'purchase_price' => 'decimal:2',
         'current_stock' => 'decimal:2',
         'min_stock' => 'decimal:2',
         'active' => 'boolean',
@@ -54,10 +52,29 @@ class Product extends Model
         return $this->hasMany(StockEntry::class);
     }
 
-    // حساب الكمية الحالية: الوارد - الصادر
-    public function getCurrentStockAttribute()
+    /**
+     * الرصيد من حركات المخزن فقط (مصدر واحد للحقيقة بعد تسجيل وارد/صادر/هالك).
+     */
+    public function recalculateCurrentStockFromEntries(): float
     {
-        return $this->stockEntries()->where('type', 'in')->sum('quantity') -
-               $this->stockEntries()->whereIn('type', ['out', 'waste'])->sum('quantity');
+        $in = (float) $this->stockEntries()->where('type', 'in')->sum('quantity');
+        $out = (float) $this->stockEntries()->whereIn('type', ['out', 'waste'])->sum('quantity');
+
+        return max(0, $in - $out);
+    }
+
+    /**
+     * للعرض في الواجهات: يعتمد على الحركات المحمّلة إن وُجدت وإلا على عمود current_stock.
+     */
+    public function displayStock(): float
+    {
+        if ($this->relationLoaded('stockEntries')) {
+            $in = (float) $this->stockEntries->where('type', 'in')->sum('quantity');
+            $out = (float) $this->stockEntries->whereIn('type', ['out', 'waste'])->sum('quantity');
+
+            return max(0, $in - $out);
+        }
+
+        return (float) ($this->current_stock ?? 0);
     }
 }

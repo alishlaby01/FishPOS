@@ -1,11 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Livewire\Stock\MorningEntry;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ShiftController;
+use App\Livewire\Stock\MorningEntry;
+use App\Models\Expense;
+use App\Models\Order;
+use App\Models\StockEntry;
+use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () { return view('welcome'); })->name('home');
+Route::get('/', function () {
+    return view('welcome');
+})->name('home');
 
 // === مسارات المصادقة ===
 Route::middleware('guest')->group(function () {
@@ -17,18 +22,20 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middl
 
 // === مسارات محمية بالمصادقة ===
 Route::middleware('auth')->group(function () {
-    
+
     // Owner Dashboard
     Route::get('/owner-dashboard', function () {
         $user = request()->user();
         abort_unless($user && $user->role === 'owner', 403);
+
         return view('owner-dashboard');
     })->name('owner-dashboard');
 
-    // Cashier Dashboard  
+    // Cashier Dashboard
     Route::get('/cashier-dashboard', function () {
         $user = request()->user();
         abort_unless($user && $user->role === 'cashier', 403);
+
         return view('cashier-dashboard');
     })->name('cashier-dashboard');
 
@@ -36,6 +43,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/cashier', function () {
         $user = request()->user();
         abort_unless($user && in_array($user->role, ['owner', 'cashier']), 403);
+
         return view('cashier');
     })->name('cashier');
 
@@ -44,7 +52,7 @@ Route::middleware('auth')->group(function () {
         $user = request()->user();
         abort_unless($user && $user->role === 'owner', 403);
 
-        $todayOrders = \App\Models\Order::whereDate('created_at', today());
+        $todayOrders = Order::whereDate('created_at', today());
 
         // إجمالي التحصيل اليومي
         $sales = (clone $todayOrders)
@@ -55,21 +63,14 @@ Route::middleware('auth')->group(function () {
         $takeawayOrdersCount = (clone $todayOrders)->where('order_type', 'takeaway')->count();
         $storeOrdersCount = (clone $todayOrders)->where('order_type', 'store')->count();
 
-        // إجمالي التكلفة (سعر الشراء للمباع)
-        $cost = \App\Models\OrderItem::whereHas('order', function($q) {
-                $q->whereDate('created_at', today());
-            })
-            ->selectRaw('SUM(quantity * purchase_price) as total_cost')
-            ->first();
-
         // إجمالي المصاريف
-        $expenses = \App\Models\Expense::whereDate('created_at', today())->sum('amount');
+        $expenses = Expense::whereDate('created_at', today())->sum('amount');
 
-        // صافي الربح
-        $netProfit = ($sales->total_sales ?? 0) - ($cost->total_cost ?? 0) - $expenses;
+        // صافي الربح (بدون تكلفة شراء — تم إلغاء سعر الشراء من النظام)
+        $netProfit = ($sales->total_sales ?? 0) - $expenses;
 
         // تقرير الهالك
-        $wasteReport = \App\Models\StockEntry::where('type', 'waste')
+        $wasteReport = StockEntry::where('type', 'waste')
             ->whereDate('created_at', today())
             ->with('product')
             ->selectRaw('product_id, SUM(quantity) as total_waste, 
@@ -78,8 +79,9 @@ Route::middleware('auth')->group(function () {
             ->orderBy('total_waste', 'desc')
             ->limit(5)
             ->get()
-            ->map(function($item) {
+            ->map(function ($item) {
                 $item->product_name = $item->product->name ?? 'غير معروف';
+
                 return $item;
             });
 
@@ -87,7 +89,7 @@ Route::middleware('auth')->group(function () {
             'total_sales' => $sales->total_sales ?? 0,
             'total_orders' => $sales->total_orders ?? 0,
             'total_discounts' => $sales->total_discounts ?? 0,
-            'total_cost' => $cost->total_cost ?? 0,
+            'total_cost' => 0,
             'total_expenses' => $expenses,
             'net_profit' => $netProfit,
             'delivery_orders_count' => $deliveryOrdersCount,
@@ -105,6 +107,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/products', function () {
         $user = request()->user();
         abort_unless($user && $user->role === 'owner', 403);
+
         return view('products');
     })->name('products')->middleware('auth');
 
@@ -112,6 +115,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/expenses', function () {
         $user = request()->user();
         abort_unless($user && in_array($user->role, ['owner', 'cashier']), 403);
+
         return view('expenses');
     })->name('expenses')->middleware('auth');
 
@@ -119,6 +123,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/orders', function () {
         $user = request()->user();
         abort_unless($user && in_array($user->role, ['owner', 'cashier']), 403);
+
         return view('orders');
     })->name('orders')->middleware('auth');
 

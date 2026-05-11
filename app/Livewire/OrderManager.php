@@ -14,8 +14,11 @@ class OrderManager extends Component
     use WithPagination;
 
     public $search = '';
+
     public $statusFilter = '';
+
     public $dateFilter = '';
+
     public $selectedOrder;
 
     public function updatedSearch()
@@ -37,12 +40,13 @@ class OrderManager extends Component
     {
         try {
             $order = Order::with(['orderItems.product', 'creator'])->find($orderId);
-            if (!$order) {
+            if (! $order) {
                 $this->dispatch('toast', ['message' => 'الطلب غير موجود.', 'type' => 'error']);
+
                 return;
             }
 
-            $this->dispatch('print-order', ['order' => $order->toArray()]);
+            $this->dispatch('print-order', order: $order->toArray());
         } catch (\Throwable $e) {
             Log::error('OrderManager::printOrder failed', ['exception' => $e]);
             $this->dispatch('toast', ['message' => 'تعذر طباعة الطلب، يرجى المحاولة مرة أخرى.', 'type' => 'error']);
@@ -72,13 +76,15 @@ class OrderManager extends Component
 
         try {
             $order = Order::find($orderId);
-            if (!$order) {
+            if (! $order) {
                 $this->dispatch('toast', ['message' => 'الطلب غير موجود.', 'type' => 'error']);
+
                 return;
             }
 
             if ($order->status === 'cancelled') {
                 $this->dispatch('toast', ['message' => 'الطلب ملغي مسبقاً.', 'type' => 'error']);
+
                 return;
             }
 
@@ -117,13 +123,17 @@ class OrderManager extends Component
             $totalSales = $orders->sum('total');
             $totalOrders = $orders->count();
 
-            $this->dispatch('print-daily-report', [
-                'date' => $date,
-                'orders' => $orders,
-                'totalSales' => $totalSales,
-                'totalOrders' => $totalOrders,
-                'scoped_to_shift' => (bool) $activeShift,
-            ]);
+            $this->dispatch('print-daily-report',
+                date: $date,
+                orders: $orders->map(fn (Order $o) => [
+                    'invoice_number' => $o->invoice_number,
+                    'created_at' => $o->created_at?->toIso8601String(),
+                    'total' => (float) $o->total,
+                ])->values()->all(),
+                totalSales: (float) $totalSales,
+                totalOrders: (int) $totalOrders,
+                scoped_to_shift: (bool) $activeShift,
+            );
         } catch (\Throwable $e) {
             Log::error('OrderManager::printDailyReport failed', ['exception' => $e]);
             $this->dispatch('toast', ['message' => 'تعذر طباعة التقرير، يرجى المحاولة مرة أخرى.', 'type' => 'error']);
@@ -140,7 +150,7 @@ class OrderManager extends Component
         $orders = Order::with(['orderItems.product', 'creator'])
             ->when($activeShift, fn ($query) => $query->where('shift_id', $activeShift->id))
             ->when(! $activeShift && Auth::user()?->role === 'cashier', fn ($query) => $query->whereRaw('1 = 0'))
-            ->when($this->search, fn ($query) => $query->where('invoice_number', 'like', '%' . $this->search . '%'))
+            ->when($this->search, fn ($query) => $query->where('invoice_number', 'like', '%'.$this->search.'%'))
             ->when($this->statusFilter, fn ($query) => $query->where('status', $this->statusFilter))
             ->when($this->dateFilter, fn ($query) => $query->whereDate('created_at', $this->dateFilter))
             ->orderBy('created_at', 'desc')

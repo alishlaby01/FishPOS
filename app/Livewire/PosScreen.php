@@ -3,8 +3,15 @@
 namespace App\Livewire;
 
 use App\Exceptions\ShiftClosedException;
-use App\Models\{Category, Driver, Order, Product, Shift, StockEntry};
-use Illuminate\Support\Facades\{Auth, DB, Log};
+use App\Models\Category;
+use App\Models\Driver;
+use App\Models\Order;
+use App\Models\Product;
+use App\Models\Shift;
+use App\Models\StockEntry;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -13,23 +20,35 @@ class PosScreen extends Component
 {
     // --- الشاشات والبحث ---
     public string $search = '';
+
     public string $selectedCategory = 'all';
 
     // --- بيانات السلة والطلب ---
     public array $cart = [];
+
     public array $quantities = []; // للكميات المُدخلة يدويًا
+
     public $discount = 0;
+
     public $deliveryFee = 0;
+
     public string $orderType = 'store';
 
     // --- بيانات العميل والطيار ---
     public ?string $customerName = null;
+
     public ?string $phone = null;
+
     public ?string $address = null;
+
     public ?int $driverId = null;
+
     public $driverCommission = 0;
+
     public string $newDriverName = '';
+
     public string $newDriverPhone = '';
+
     public array $customerRecentOrders = [];
 
     /**
@@ -38,7 +57,7 @@ class PosScreen extends Component
     public function mount(): void
     {
         // 1) التحقق من وجود وردية فعالة
-        if (!$this->checkActiveShift()) {
+        if (! $this->checkActiveShift()) {
             return;
         }
 
@@ -57,9 +76,10 @@ class PosScreen extends Component
             ->whereNull('closed_at')
             ->exists();
 
-        if (!$hasShift) {
+        if (! $hasShift) {
             session()->flash('error', 'برجاء فتح وردية أولاً.');
             $this->dispatch('openShiftManager');
+
             return false;
         }
 
@@ -85,9 +105,9 @@ class PosScreen extends Component
     {
         return Product::query()
             ->where('active', true)
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
+            ->when($this->search, fn ($q) => $q->where('name', 'like', "%{$this->search}%"))
             ->when($this->selectedCategory !== 'all', function ($q) {
-                $q->whereHas('category', fn($c) => $c->where('slug', $this->selectedCategory));
+                $q->whereHas('category', fn ($c) => $c->where('slug', $this->selectedCategory));
             })->get();
     }
 
@@ -106,7 +126,7 @@ class PosScreen extends Component
     #[Computed]
     public function selectedDriverDetails(): ?Driver
     {
-        if (!$this->driverId) {
+        if (! $this->driverId) {
             return null;
         }
 
@@ -143,8 +163,9 @@ class PosScreen extends Component
             ->where('active', true)
             ->find($id);
 
-        if (!$product) {
+        if (! $product) {
             $this->addError('order', 'هذا المنتج غير متاح الآن.');
+
             return;
         }
 
@@ -231,15 +252,15 @@ class PosScreen extends Component
 
     // --- حفظ الطلبات ---
 
-    public function saveAndPrint() 
-{ 
-    $this->storeOrder(print: true); 
-}
+    public function saveAndPrint()
+    {
+        $this->storeOrder(print: true);
+    }
 
-public function saveOrder() 
-{ 
-    $this->storeOrder(print: false); 
-}
+    public function saveOrder()
+    {
+        $this->storeOrder(print: false);
+    }
 
     public function updatedOrderType($value): void
     {
@@ -267,6 +288,7 @@ public function saveOrder()
         $phone = trim((string) $value);
         if (mb_strlen($phone) < 6) {
             $this->customerRecentOrders = [];
+
             return;
         }
 
@@ -313,7 +335,7 @@ public function saveOrder()
             ->where('order_type', 'delivery')
             ->first();
 
-        if (!$order) {
+        if (! $order) {
             return;
         }
 
@@ -353,7 +375,7 @@ public function saveOrder()
         }
 
         $driver = Driver::find($driverId);
-        if (!$driver) {
+        if (! $driver) {
             return;
         }
 
@@ -366,6 +388,7 @@ public function saveOrder()
                 $this->persistState();
             }
             session()->flash('error', 'لا يمكن حذف الطيار المرتبط بطلبات سابقة، تم تعطيله بدلاً من ذلك.');
+
             return;
         }
 
@@ -396,6 +419,7 @@ public function saveOrder()
 
         if (count($productIds) !== count($this->cart)) {
             $this->addError('order', 'بيانات السلة غير صالحة.');
+
             return null;
         }
 
@@ -410,18 +434,21 @@ public function saveOrder()
             $productId = (int) ($row['product_id'] ?? 0);
             if ($productId <= 0) {
                 $this->addError('order', 'بيانات السلة غير صالحة.');
+
                 return null;
             }
 
             $qty = (float) ($row['qty'] ?? 0);
             if ($qty <= 0) {
                 $this->addError('order', 'الكمية يجب أن تكون أكبر من صفر.');
+
                 return null;
             }
 
             $product = $products->get($productId);
-            if (!$product) {
+            if (! $product) {
                 $this->addError('order', 'منتج غير متوفر أو تم إيقافه.');
+
                 return null;
             }
 
@@ -429,11 +456,11 @@ public function saveOrder()
             $lineTotal = $unitPrice * $qty;
 
             $items[] = [
-                'product_id'   => $product->id,
-                'name'         => $product->name,
-                'price'        => $unitPrice,
-                'qty'          => $qty,
-                'total'        => $lineTotal,
+                'product_id' => $product->id,
+                'name' => $product->name,
+                'price' => $unitPrice,
+                'qty' => $qty,
+                'total' => $lineTotal,
                 'product_type' => $product->product_type,
             ];
         }
@@ -446,20 +473,20 @@ public function saveOrder()
         $total = max(0, $subtotal - $discount + $deliveryFee);
 
         return [
-            'items'    => $items,
+            'items' => $items,
             'subtotal' => $subtotal,
-            'total'    => $total,
+            'total' => $total,
         ];
     }
 
     private function storeOrder(bool $print)
     {
         $this->validate([
-            'discount'   => 'nullable|numeric|min:0',
+            'discount' => 'nullable|numeric|min:0',
             'deliveryFee' => 'nullable|numeric|min:0',
-            'driverId'   => 'required_if:orderType,delivery|nullable|exists:drivers,id',
+            'driverId' => 'required_if:orderType,delivery|nullable|exists:drivers,id',
             'driverCommission' => 'nullable|numeric|min:0',
-            'cart'       => 'required|array|min:1',
+            'cart' => 'required|array|min:1',
         ], [
             'cart.required' => 'السلة فارغة، أضف منتجات أولاً.',
             'driverId.required_if' => 'لا يمكن حفظ أو طباعة أوردر الدليفري بدون اختيار الطيار.',
@@ -470,16 +497,18 @@ public function saveOrder()
                 ->where('is_active', true)
                 ->exists();
 
-            if (!$validDriver) {
+            if (! $validDriver) {
                 $this->addError('driverId', 'الطيار المختار غير متاح حالياً، اختر طيارًا آخر.');
+
                 return;
             }
         }
 
         $activeShift = Shift::where('user_id', Auth::id())->whereNull('closed_at')->first();
 
-        if (!$activeShift) {
+        if (! $activeShift) {
             $this->addError('order', 'انتهت جلستك أو تم إغلاق الوردية.');
+
             return;
         }
 
@@ -500,25 +529,25 @@ public function saveOrder()
                     ->lockForUpdate()
                     ->first();
 
-                if (!$shift) {
-                    throw new ShiftClosedException();
+                if (! $shift) {
+                    throw new ShiftClosedException;
                 }
 
                 // إنشاء الطلب
                 $order = Order::create([
-                    'invoice_number'    => 'TMP-' . Str::uuid(),
-                    'order_type'        => $this->orderType,
-                    'customer_name'     => $this->customerName,
-                    'phone'             => $this->phone,
-                    'address'           => $this->address,
-                    'subtotal'          => $resolved['subtotal'],
-                    'discount'          => $this->discount,
-                    'delivery_fee'      => $deliveryFeeForOrder,
-                    'total'             => $resolved['total'],
-                    'status'            => 'completed',
-                    'created_by'        => Auth::id(),
-                    'shift_id'          => $shift->id,
-                    'driver_id'         => $this->orderType === 'delivery' ? $this->driverId : null,
+                    'invoice_number' => 'TMP-'.Str::uuid(),
+                    'order_type' => $this->orderType,
+                    'customer_name' => $this->customerName,
+                    'phone' => $this->phone,
+                    'address' => $this->address,
+                    'subtotal' => $resolved['subtotal'],
+                    'discount' => $this->discount,
+                    'delivery_fee' => $deliveryFeeForOrder,
+                    'total' => $resolved['total'],
+                    'status' => 'completed',
+                    'created_by' => Auth::id(),
+                    'shift_id' => $shift->id,
+                    'driver_id' => $this->orderType === 'delivery' ? $this->driverId : null,
                     'driver_commission' => $this->orderType === 'delivery' ? $this->driverCommission : 0,
                 ]);
 
@@ -537,27 +566,27 @@ public function saveOrder()
                         ->lockForUpdate()
                         ->first();
 
-                    if (!$product) {
+                    if (! $product) {
                         throw new \RuntimeException('Product unavailable');
                     }
 
                     $order->orderItems()->create([
                         'product_id' => $item['product_id'],
-                        'quantity'   => $item['qty'],
-                        'price'      => $item['price'],
-                        'total'      => $item['total'],
+                        'quantity' => $item['qty'],
+                        'price' => $item['price'],
+                        'total' => $item['total'],
                     ]);
 
                     StockEntry::create([
                         'product_id' => $item['product_id'],
-                        'quantity'   => $item['qty'],
-                        'type'       => 'out',
-                        'note'       => "بيع فاتورة: {$order->invoice_number}",
+                        'quantity' => $item['qty'],
+                        'type' => 'out',
+                        'note' => "بيع فاتورة: {$order->invoice_number}",
                     ]);
 
-                    $currentStock = (float) ($product->getRawOriginal('current_stock') ?? 0);
+                    $product->unsetRelation('stockEntries');
                     $product->update([
-                        'current_stock' => max(0, $currentStock - (float) $item['qty']),
+                        'current_stock' => $product->recalculateCurrentStockFromEntries(),
                     ]);
                 }
 
@@ -567,16 +596,16 @@ public function saveOrder()
             if ($print) {
                 $this->dispatch('print-receipt', order: [
                     'invoice_number' => $order->invoice_number,
-                    'created_at'     => $order->created_at?->format('Y-m-d H:i'),
-                    'order_type'     => $order->order_type,
-                    'customer_name'  => $order->customer_name,
-                    'phone'          => $order->phone,
-                    'address'        => $order->address,
-                    'total'          => $resolved['total'],
-                    'discount'       => (float) $this->discount,
-                    'delivery_fee'   => $deliveryFeeForOrder,
-                    'subtotal'       => $resolved['subtotal'],
-                    'items'          => $resolved['items'],
+                    'created_at' => $order->created_at?->format('Y-m-d H:i'),
+                    'order_type' => $order->order_type,
+                    'customer_name' => $order->customer_name,
+                    'phone' => $order->phone,
+                    'address' => $order->address,
+                    'total' => $resolved['total'],
+                    'discount' => (float) $this->discount,
+                    'delivery_fee' => $deliveryFeeForOrder,
+                    'subtotal' => $resolved['subtotal'],
+                    'items' => $resolved['items'],
                 ]);
             }
 
@@ -606,31 +635,31 @@ public function saveOrder()
     private function persistState()
     {
         session(['pos_cart_state' => [
-            'cart'          => $this->cart,
-            'quantities'    => $this->quantities,
-            'discount'      => $this->discount,
-            'delivery_fee'  => $this->deliveryFee,
-            'order_type'    => $this->orderType,
-            'driver_id'     => $this->driverId,
+            'cart' => $this->cart,
+            'quantities' => $this->quantities,
+            'discount' => $this->discount,
+            'delivery_fee' => $this->deliveryFee,
+            'order_type' => $this->orderType,
+            'driver_id' => $this->driverId,
             'driver_commission' => $this->driverCommission,
             'customer_name' => $this->customerName,
-            'phone'         => $this->phone,
-            'address'       => $this->address,
+            'phone' => $this->phone,
+            'address' => $this->address,
         ]]);
     }
 
     private function loadState(array $state)
     {
-        $this->cart         = $this->normalizeCart($state['cart'] ?? []);
-        $this->quantities   = $state['quantities'] ?? [];
-        $this->discount     = (float) ($state['discount'] ?? 0);
-        $this->deliveryFee  = (float) ($state['delivery_fee'] ?? 0);
-        $this->orderType    = $state['order_type'] ?? 'store';
-        $this->driverId     = isset($state['driver_id']) ? (int) $state['driver_id'] : null;
+        $this->cart = $this->normalizeCart($state['cart'] ?? []);
+        $this->quantities = $state['quantities'] ?? [];
+        $this->discount = (float) ($state['discount'] ?? 0);
+        $this->deliveryFee = (float) ($state['delivery_fee'] ?? 0);
+        $this->orderType = $state['order_type'] ?? 'store';
+        $this->driverId = isset($state['driver_id']) ? (int) $state['driver_id'] : null;
         $this->driverCommission = (float) ($state['driver_commission'] ?? 0);
         $this->customerName = $state['customer_name'] ?? null;
-        $this->phone        = $state['phone'] ?? null;
-        $this->address      = $state['address'] ?? null;
+        $this->phone = $state['phone'] ?? null;
+        $this->address = $state['address'] ?? null;
 
         if ($this->orderType === 'delivery' && $this->phone) {
             $this->updatedPhone($this->phone);
@@ -647,12 +676,13 @@ public function saveOrder()
                 $this->quantities[$item['product_id']] = $item['qty'];
             }
         }
+
         return $normalized;
     }
 
     private function generateInvoiceNo($id): string
     {
-        return 'INV-' . now()->format('ymd') . '-' . str_pad($id, 4, '0', STR_PAD_LEFT);
+        return 'INV-'.now()->format('ymd').'-'.str_pad($id, 4, '0', STR_PAD_LEFT);
     }
 
     public function render()

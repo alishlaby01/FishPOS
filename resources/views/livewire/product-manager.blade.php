@@ -13,7 +13,7 @@
                     </svg>
                     العودة للكاشير
                 </a>
-                <button wire:click="openModal" class="bg-[#5B45FF] hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition">
+                <button type="button" wire:click="openModal" class="bg-[#5B45FF] hover:bg-indigo-700 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                     </svg>
@@ -51,7 +51,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-200">
                         @forelse($products as $product)
-                            <tr class="hover:bg-slate-50">
+                            <tr wire:key="product-row-{{ $product->id }}" class="hover:bg-slate-50">
                                 <td class="px-6 py-4">
                                     <div class="font-bold text-slate-800">{{ $product->name }}</div>
                                 </td>
@@ -109,7 +109,7 @@
 
     <!-- Modal -->
     @if($showModal)
-        <div class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+        <div wire:key="product-modal-{{ $editingProduct?->id ?: 'new' }}" class="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
             <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 relative">
                 <button wire:click="closeModal" class="absolute top-4 left-4 text-slate-500 hover:text-slate-900 text-2xl">&times;</button>
                 <h2 class="text-2xl font-bold text-slate-800 mb-4">
@@ -137,8 +137,6 @@
                     <div>
                         <label class="block text-sm font-bold text-slate-600 mb-2">السعر</label>
                         <input type="number" step="0.01" wire:model="price" class="w-full border border-slate-300 rounded-2xl px-4 py-3 focus:border-indigo-500 outline-none" placeholder="0.00">
-                        <label class="block text-sm font-medium text-slate-700 mt-2">سعر الشراء</label>
-                        <input type="number" step="0.01" wire:model="purchase_price" class="w-full border border-slate-300 rounded-2xl px-4 py-3 focus:border-indigo-500 outline-none" placeholder="0.00">
                         @error('price') <p class="mt-1 text-sm text-red-500">{{ $message }}</p> @enderror
                     </div>
 
@@ -175,7 +173,7 @@
                     </div>
 
                     <div class="flex gap-3 mt-6">
-                        <button type="submit" wire:loading.attr="disabled"
+                        <button type="submit" wire:loading.attr="disabled" wire:target="saveProduct"
                             class="flex-1 bg-[#5B45FF] hover:bg-indigo-700 text-white py-3 rounded-2xl font-bold transition">
                             {{ $editingProduct ? 'تحديث' : 'إضافة' }}
                         </button>

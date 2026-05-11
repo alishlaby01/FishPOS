@@ -23,28 +23,28 @@ class ProductSeeder extends Seeder
                     ['name' => 'دنيس', 'price' => 180.00],
                     ['name' => 'قاروص', 'price' => 220.00],
                     ['name' => 'جمبري', 'price' => 260.00],
-                ]
+                ],
             ],
             'Fried' => [
                 'type' => 'weight', // سمك مقلي بالكيلو
                 'products' => [
                     ['name' => 'بلطي مقلي', 'price' => 110.00],
                     ['name' => 'بوري مقلي', 'price' => 140.00],
-                ]
+                ],
             ],
             'Grilled' => [
                 'type' => 'weight', // سمك مشوي بالكيلو
                 'products' => [
                     ['name' => 'بلطي مشوي', 'price' => 115.00],
                     ['name' => 'بوري مشوي', 'price' => 145.00],
-                ]
+                ],
             ],
             'Meal' => [
                 'type' => 'piece', // وجبات بالقطعة
                 'products' => [
                     ['name' => 'وجبة جمبري', 'price' => 320.00],
                     ['name' => 'وجبة فيليه', 'price' => 280.00],
-                ]
+                ],
             ],
             'Extras' => [
                 'type' => 'piece', // إضافات بالقطعة
@@ -53,7 +53,7 @@ class ProductSeeder extends Seeder
                     ['name' => 'طحينة', 'price' => 10.00],
                     ['name' => 'سلطة', 'price' => 15.00],
                     ['name' => 'بطاطس', 'price' => 25.00],
-                ]
+                ],
             ],
             'Drinks' => [
                 'type' => 'piece', // مشروبات بالقطعة
@@ -61,7 +61,7 @@ class ProductSeeder extends Seeder
                     ['name' => 'بيبسي', 'price' => 10.00],
                     ['name' => 'كوكاكولا', 'price' => 10.00],
                     ['name' => 'ماء', 'price' => 5.00],
-                ]
+                ],
             ],
         ];
 
@@ -95,6 +95,11 @@ class ProductSeeder extends Seeder
                     'quantity' => rand(10, 50), // Random stock between 10-50
                     'type' => 'in',
                     'note' => 'Initial stock from seeder',
+                ]);
+
+                $createdProduct->unsetRelation('stockEntries');
+                $createdProduct->update([
+                    'current_stock' => $createdProduct->recalculateCurrentStockFromEntries(),
                 ]);
             }
         }

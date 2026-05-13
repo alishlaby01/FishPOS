@@ -1,12 +1,12 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ShiftController;
 use App\Livewire\Stock\MorningEntry;
 use App\Models\Expense;
 use App\Models\Order;
 use App\Models\StockEntry;
-use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
@@ -127,11 +127,6 @@ Route::middleware('auth')->group(function () {
         return view('orders');
     })->name('orders')->middleware('auth');
 
-    // صفحة طباعة الفاتورة
-    Route::get('/receipt', function () {
-        return view('receipt');
-    })->name('receipt');
-
     // إدارة الورديات
     Route::prefix('shifts')->name('shifts.')->group(function () {
         Route::post('/open', [ShiftController::class, 'open'])->name('open');
@@ -142,3 +137,9 @@ Route::middleware('auth')->group(function () {
 Route::get('/pos', function () {
     return view('layouts.app', ['slot' => view('livewire.pos-screen')]);
 })->name('pos');
+
+
+#للتجربة فقط طباعو ريسيت  
+Route::get('/test-print', function () {
+    return view('print_test');
+});

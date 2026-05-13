@@ -1,9 +1,14 @@
 <div class="p-6">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100">إدارة الطلبات</h3>
-        <button wire:click="printDailyReport" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-            طباعة التقرير اليومي 📊
-        </button>
+        <div class="flex flex-wrap gap-3">
+            <a href="{{ route('cashier') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                الرجوع الى الكاشير
+            </a>
+            <button wire:click="printDailyReport" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                طباعة التقرير اليومي 📊
+            </button>
+        </div>
     </div>
 
     @if(isset($activeShift) && $activeShift)
@@ -25,13 +30,12 @@
                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">الحالة</label>
-                <select wire:model.live="statusFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">جميع الحالات</option>
-                    <option value="pending">في الانتظار</option>
-                    <option value="processing">قيد التجهيز</option>
-                    <option value="completed">مكتمل</option>
-                    <option value="cancelled">ملغي</option>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">نوع الطلب</label>
+                <select wire:model.live="typeFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">جميع الأنواع</option>
+                    <option value="delivery">دليفري</option>
+                    <option value="takeaway">تيك أواي</option>
+                    <option value="store">صالة</option>
                 </select>
             </div>
             <div>
@@ -219,9 +223,9 @@
             .replace(/'/g, '&#039;');
 
         const openPrintWindow = (bodyHtml, title) => {
-            const printWindow = window.open('', '_blank', 'width=900,height=900');
+            const printWindow = window.open('', '_blank', 'width=320,height=700');
             if (! printWindow) {
-                window.alert('تعذر فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع.');
+                window.alert('تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة ثم حاول مرة أخرى.');
                 return;
             }
             const doc = `<!DOCTYPE html>
@@ -231,17 +235,134 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(title)}</title>
     <style>
-        @page { margin: 12mm; }
-        body { font-family: Tahoma, Arial, sans-serif; color: #000; background: #fff; margin: 0; padding: 16px; }
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 80mm;
+            background: #fff;
+            font-family: Arial, Tahoma, sans-serif;
+            color: #000;
+            direction: rtl;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        .receipt-print {
+            width: 72mm;
+            min-width: 72mm;
+            margin: 0 auto;
+            padding: 4mm 4mm 6mm;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #000;
+        }
+        .receipt-print h2 {
+            margin: 0 0 8px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 700;
+            color: #000;
+        }
+        .receipt-print p {
+            margin: 4px 0;
+            font-size: 12px;
+            line-height: 1.5;
+            font-weight: 500;
+            color: #000;
+        }
+        .receipt-print table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            table-layout: fixed;
+            font-size: 12px;
+        }
+        .receipt-print th,
+        .receipt-print td {
+            border: 1px solid #000;
+            padding: 4px 3px;
+            line-height: 1.5;
+            word-break: break-word;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            color: #000;
+        }
+        .receipt-print th {
+            background: #fff;
+            text-align: right;
+            font-weight: 700;
+            color: #000;
+        }
+        .receipt-print td {
+            vertical-align: top;
+        }
+        .receipt-print .item-name {
+            width: 45%;
+            text-align: right;
+            font-weight: 600;
+            word-break: break-word;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            color: #000;
+        }
+        .receipt-print .item-center {
+            width: 15%;
+            text-align: center;
+            font-weight: 600;
+            color: #000;
+        }
+        .receipt-print .item-price,
+        .receipt-print .item-right {
+            width: 20%;
+            text-align: left;
+            font-weight: 600;
+            color: #000;
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+            font-size: 13px;
+            line-height: 1.5;
+            font-weight: 600;
+            color: #000;
+        }
+        .summary-row.total {
+            font-weight: 700;
+            font-size: 14px;
+            border-top: 1px solid #000;
+            padding-top: 3px;
+            margin-top: 6px;
+            color: #000;
+        }
+        .receipt-print hr {
+            border: none;
+            border-top: 1px solid #000;
+            margin: 5px 0;
+        }
     </style>
 </head>
-<body onload="window.print(); setTimeout(() => window.close(), 400);">
+<body>
 ${bodyHtml}
 </body>
 </html>`;
             printWindow.document.open();
             printWindow.document.write(doc);
             printWindow.document.close();
+            printWindow.onload = function() {
+                setTimeout(() => {
+                    printWindow.print();
+                }, 100);
+            };
+            printWindow.onafterprint = function() {
+                setTimeout(() => {
+                    printWindow.close();
+                }, 1000);
+            };
         };
 
         Livewire.on('print-order', (payload) => {
@@ -258,45 +379,61 @@ ${bodyHtml}
             let rows = '';
             items.forEach((item) => {
                 const pname = escapeHtml(item.product?.name ?? '—');
+                const quantity = Number(item.quantity ?? 0).toFixed(2);
+                const unitPrice = Number(item.unit_price ?? 0).toFixed(2);
+                const itemTotal = Number(item.total ?? 0).toFixed(2);
                 rows += `
             <tr>
-                <td style="border: 1px solid #ccc; padding: 8px;">${pname}</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">${escapeHtml(item.quantity)}</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align: right;">${Number(item.total ?? 0).toFixed(2)} ج.م</td>
+                <td class="item-name">${pname}</td>
+                <td class="item-center">${quantity}</td>
+                <td class="item-price">${unitPrice}</td>
+                <td class="item-right">${itemTotal} ج.م</td>
             </tr>`;
             });
             if (isDelivery && deliveryFee > 0) {
                 rows += `
-            <tr style="font-style: italic;">
-                <td style="border: 1px solid #ccc; padding: 8px;" colspan="2">رسوم التوصيل</td>
-                <td style="border: 1px solid #ccc; padding: 8px; text-align: right;">${deliveryFee.toFixed(2)} ج.م</td>
+            <tr>
+                <td class="item-name">رسوم التوصيل</td>
+                <td class="item-center">—</td>
+                <td class="item-price">—</td>
+                <td class="item-right">${deliveryFee.toFixed(2)} ج.م</td>
             </tr>`;
             }
 
             const creatorName = escapeHtml(order.creator?.name ?? order.creator_name ?? 'غير معروف');
             const inv = escapeHtml(order.invoice_number ?? '');
+            const printedAt = new Date().toLocaleString('ar-EG', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+            });
             const body = `
-        <div style="font-family: Tahoma, Arial, sans-serif; max-width: 420px; margin: 0 auto; padding: 8px;" dir="rtl">
-            <h2 style="text-align: center; margin-bottom: 16px;">فاتورة الطلب</h2>
+        <div class="receipt-print" dir="rtl">
+            <h2>فاتورة الطلب</h2>
             <p><strong>رقم الفاتورة:</strong> ${inv}</p>
-            <p><strong>التاريخ:</strong> ${escapeHtml(new Date(order.created_at).toLocaleString('ar-EG'))}</p>
+            <p><strong>التاريخ:</strong> ${escapeHtml(printedAt)}</p>
             <p><strong>الكاشير:</strong> ${creatorName}</p>
-            <hr style="margin: 16px 0;">
-            <table style="width: 100%; border-collapse: collapse;">
+            <hr>
+            <table>
                 <thead>
                     <tr>
-                        <th style="border: 1px solid #ccc; padding: 8px; text-align: right;">المنتج</th>
-                        <th style="border: 1px solid #ccc; padding: 8px; text-align: center;">الكمية</th>
-                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">الإجمالي</th>
+                        <th class="item-name">المنتج</th>
+                        <th class="item-center">الكم</th>
+                        <th class="item-price">السعر</th>
+                        <th class="item-right">الإجمالي</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
             </table>
-            <hr style="margin: 16px 0;">
-            <p style="display:flex; justify-content: space-between;"><span>مجموع الأصناف</span><span>${subtotal.toFixed(2)} ج.م</span></p>
-            <p style="display:flex; justify-content: space-between;"><span>الخصم</span><span>${discount.toFixed(2)} ج.م</span></p>
-            ${isDelivery ? `<p style="display:flex; justify-content: space-between;"><span>رسوم التوصيل</span><span>${deliveryFee.toFixed(2)} ج.م</span></p>` : ''}
-            <p style="text-align: center; font-size: 18px; font-weight: bold; margin-top: 12px;">الإجمالي المحصل: ${Number(order.total ?? 0).toFixed(2)} ج.م</p>
+            <hr>
+            <div class="summary-row"><span>الأصناف</span><span>${subtotal.toFixed(2)} ج.م</span></div>
+            <div class="summary-row"><span>الخصم</span><span>${discount.toFixed(2)} ج.م</span></div>
+            ${isDelivery ? `<div class="summary-row"><span>التوصيل</span><span>${deliveryFee.toFixed(2)} ج.م</span></div>` : ''}
+            <div class="summary-row total">الإجمالي: ${Number(order.total ?? 0).toFixed(2)} ج.م</div>
         </div>`;
 
             openPrintWindow(body, `فاتورة ${order.invoice_number ?? ''}`);

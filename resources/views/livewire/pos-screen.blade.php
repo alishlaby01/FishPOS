@@ -117,13 +117,6 @@
             <section class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
                 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
                     <h2 class="text-lg font-bold text-white">الطلب الحالي</h2>
-                    <button
-                        type="button"
-                        wire:click="$dispatch('openShiftManager')"
-                        class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-amber-500/30 transition hover:bg-amber-500"
-                    >
-                        إدارة الوردية
-                    </button>
                 </div>
 
                 <div class="space-y-2">
@@ -305,53 +298,6 @@
                 </section>
             @endif
 
-            <section class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
-                <div class="mb-3 flex items-center justify-between">
-                    <h3 class="text-base font-bold text-white">أوردرات الدليفري</h3>
-                    <a href="{{ route('orders') }}" class="text-xs text-indigo-300 hover:text-indigo-200">عرض الكل</a>
-                </div>
-                <div class="space-y-2">
-                    @forelse($this->deliveryOrders as $order)
-                        <div class="rounded-xl border border-slate-800 bg-slate-900 p-3 text-sm">
-                            <div class="flex items-center justify-between">
-                                <p class="font-bold text-white">{{ $order->invoice_number }}</p>
-                                <span class="rounded-full bg-indigo-900/40 px-2 py-0.5 text-xs text-indigo-300">دليفري</span>
-                            </div>
-                            <p class="mt-1 text-xs text-slate-300">العميل: {{ $order->customer_name ?: 'غير مسجل' }}</p>
-                            <p class="mt-1 text-xs text-slate-400">الطيار: {{ $order->driver?->name ?: 'غير محدد' }}</p>
-                            <p class="mt-1 text-xs text-emerald-400">الإجمالي: {{ number_format((float) $order->total, 2) }} ج.م</p>
-                        </div>
-                    @empty
-                        <div class="rounded-xl border border-dashed border-slate-700 p-4 text-center text-sm text-slate-500">
-                            لا توجد أوردرات دليفري حتى الآن.
-                        </div>
-                    @endforelse
-                </div>
-            </section>
-
-            <section class="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
-                <div class="mb-3 flex items-center justify-between">
-                    <h3 class="text-base font-bold text-white">الأوردرات الجاهزة</h3>
-                    <a href="{{ route('orders') }}" class="text-xs text-indigo-300 hover:text-indigo-200">عرض الكل</a>
-                </div>
-                <div class="space-y-2">
-                    @forelse($this->readyOrders as $order)
-                        <div class="rounded-xl border border-slate-800 bg-slate-900 p-3 text-sm">
-                            <div class="flex items-center justify-between">
-                                <p class="font-bold text-white">{{ $order->invoice_number }}</p>
-                                <span class="rounded-full bg-emerald-900/40 px-2 py-0.5 text-xs text-emerald-300">جاهز</span>
-                            </div>
-                            <p class="mt-1 text-xs text-slate-400">نوع الطلب: {{ $order->order_type }}</p>
-                            <p class="mt-1 text-xs text-slate-400">الوقت: {{ $order->created_at?->format('h:i A') }}</p>
-                            <p class="mt-1 text-xs text-emerald-400">الإجمالي: {{ number_format((float) $order->total, 2) }} ج.م</p>
-                        </div>
-                    @empty
-                        <div class="rounded-xl border border-dashed border-slate-700 p-4 text-center text-sm text-slate-500">
-                            لا توجد أوردرات جاهزة حاليًا.
-                        </div>
-                    @endforelse
-                </div>
-            </section>
         </div>
     </div>
 </div>
@@ -377,20 +323,20 @@
         };
 
         Livewire.on('print-receipt', ({ order }) => {
-            if (!order) return;
+            if (! order) return;
 
             const items = Array.isArray(order.items) ? order.items : [];
             const itemsRows = items.map((item) => {
                 const name = escapeHtml(item.name ?? '');
-                const qty = Number(item.qty ?? 0);
+                const qty = Number(item.qty ?? 0).toFixed(2);
                 const price = Number(item.price ?? 0).toFixed(2);
                 const total = Number(item.total ?? 0).toFixed(2);
                 return `
                     <tr>
                         <td class="item-name">${name}</td>
                         <td class="item-center">${qty}</td>
-                        <td class="item-center">${price}</td>
-                        <td class="item-right">${total}</td>
+                        <td class="item-price">${price}</td>
+                        <td class="item-total">${total}</td>
                     </tr>
                 `;
             }).join('');
@@ -401,90 +347,200 @@
                 ? `<tr class="delivery-fee-row">
                         <td class="item-name">رسوم التوصيل</td>
                         <td class="item-center">—</td>
-                        <td class="item-center">—</td>
-                        <td class="item-right">${deliveryFee.toFixed(2)}</td>
+                        <td class="item-price">—</td>
+                        <td class="item-total">${deliveryFee.toFixed(2)}</td>
                    </tr>`
                 : '';
 
-            const printWindow = window.open('', '_blank', 'width=420,height=900');
-            if (!printWindow) return;
+            const printedAt = new Date().toLocaleString('ar-EG', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+            });
 
-            const html = `
-                <!DOCTYPE html>
-                <html lang="ar" dir="rtl">
-                <head>
-                    <meta charset="UTF-8" />
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                    <title>فاتورة ${escapeHtml(order.invoice_number)}</title>
-                    <style>
-                        @page { size: 80mm auto; margin: 3mm; }
-                        body { font-family: Tahoma, Arial, sans-serif; color: #000; margin: 0; background: #fff; }
-                        .receipt { width: 74mm; margin: 0 auto; font-size: 12px; line-height: 1.4; }
-                        .center { text-align: center; }
-                        .sep { border-top: 1px dashed #000; margin: 6px 0; }
-                        .title { font-size: 16px; font-weight: 700; }
-                        .meta { font-size: 11px; }
-                        .pill { display: inline-block; border: 1px solid #000; border-radius: 999px; padding: 1px 8px; font-size: 11px; margin-top: 4px; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-                        th, td { padding: 3px 0; border-bottom: 1px dotted #999; }
-                        th { font-size: 10px; }
-                        .item-name { width: 40%; text-align: right; }
-                        .item-center { width: 15%; text-align: center; }
-                        .item-right { width: 30%; text-align: left; }
-                        .delivery-fee-row td { font-style: italic; color: #333; }
-                        .totals div { display: flex; justify-content: space-between; margin: 2px 0; }
-                        .totals .final { font-weight: 700; font-size: 13px; }
-                    </style>
-                </head>
-                <body onload="window.print(); setTimeout(() => window.close(), 300);">
-                    <div class="receipt">
-                        <div class="center">
-                            <div class="title">Fish POS</div>
-                            <div class="meta">فاتورة بيع</div>
-                            <div class="pill">${orderTypeLabel(order.order_type)}</div>
-                        </div>
+            const printWindow = window.open('', '_blank', 'width=320,height=700');
+            if (! printWindow) {
+                window.alert('تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة ثم حاول مرة أخرى.');
+                return;
+            }
 
-                        <div class="sep"></div>
-                        <div class="meta"><strong>رقم الفاتورة:</strong> ${escapeHtml(order.invoice_number)}</div>
-                        <div class="meta"><strong>التاريخ:</strong> ${escapeHtml(order.created_at ?? '')}</div>
-                        ${order.customer_name ? `<div class="meta"><strong>العميل:</strong> ${escapeHtml(order.customer_name)}</div>` : ''}
-                        ${order.phone ? `<div class="meta"><strong>الهاتف:</strong> ${escapeHtml(order.phone)}</div>` : ''}
-                        ${order.address ? `<div class="meta"><strong>العنوان:</strong> ${escapeHtml(order.address)}</div>` : ''}
+            const html = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>فاتورة ${escapeHtml(order.invoice_number)}</title>
+    <style>
+        @page {
+            size: 80mm auto;
+            margin: 0;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 80mm;
+            background: #fff;
+            font-family: Arial, Tahoma, sans-serif;
+            color: #000;
+            direction: rtl;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        .receipt {
+            width: 72mm;
+            min-width: 72mm;
+            margin: 0 auto;
+            padding: 4mm 4mm 6mm;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #000;
+        }
+        .center {
+            text-align: center;
+        }
+        .title {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .meta {
+            font-size: 12px;
+            line-height: 1.5;
+            margin: 3px 0;
+            font-weight: 500;
+        }
+        .pill {
+            display: inline-block;
+            border: 1px solid #000;
+            border-radius: 999px;
+            padding: 1px 6px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .sep {
+            border-top: 1px dashed #000;
+            margin: 6px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin-top: 6px;
+            font-size: 12px;
+        }
+        th, td {
+            padding: 4px 2px;
+            border-bottom: 1px dashed #999;
+            vertical-align: top;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        th {
+            text-align: right;
+        }
+        .item-name {
+            width: 45%;
+            text-align: right;
+            word-break: break-word;
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+        .item-center {
+            width: 15%;
+            text-align: center;
+        }
+        .item-price,
+        .item-total {
+            width: 20%;
+            text-align: left;
+        }
+        .delivery-fee-row td {
+            font-style: italic;
+            color: #333;
+        }
+        .totals {
+            margin-top: 8px;
+        }
+        .totals div {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #000;
+        }
+        .totals .final {
+            font-weight: 700;
+            font-size: 14px;
+            border-top: 1px solid #000;
+            padding-top: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <div class="center">
+            <div class="title">Fish POS</div>
+            <div class="meta">فاتورة بيع</div>
+            <div class="pill">${orderTypeLabel(order.order_type)}</div>
+        </div>
 
-                        <div class="sep"></div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th class="item-name">الصنف</th>
-                                    <th class="item-center">ك</th>
-                                    <th class="item-center">سعر</th>
-                                    <th class="item-right">إجمالي</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${itemsRows}
-                                ${deliveryRow}
-                            </tbody>
-                        </table>
+        <div class="sep"></div>
+        <div class="meta"><strong>رقم الفاتورة:</strong> ${escapeHtml(order.invoice_number)}</div>
+        <div class="meta"><strong>التاريخ:</strong> ${escapeHtml(printedAt)}</div>
+        ${order.customer_name ? `<div class="meta"><strong>العميل:</strong> ${escapeHtml(order.customer_name)}</div>` : ''}
+        ${order.phone ? `<div class="meta"><strong>الهاتف:</strong> ${escapeHtml(order.phone)}</div>` : ''}
+        ${order.address ? `<div class="meta"><strong>العنوان:</strong> ${escapeHtml(order.address)}</div>` : ''}
 
-                        <div class="sep"></div>
-                        <div class="totals">
-                            <div><span>مجموع الأصناف</span><span>${Number(order.subtotal ?? 0).toFixed(2)} ج.م</span></div>
-                            <div><span>الخصم</span><span>${Number(order.discount ?? 0).toFixed(2)} ج.م</span></div>
-                            ${isDelivery ? `<div><span>رسوم التوصيل</span><span>${deliveryFee.toFixed(2)} ج.م</span></div>` : ''}
-                            <div class="final"><span>الإجمالي المحصل</span><span>${Number(order.total ?? 0).toFixed(2)} ج.م</span></div>
-                        </div>
+        <div class="sep"></div>
+        <table>
+            <thead>
+                <tr>
+                    <th class="item-name">الصنف</th>
+                    <th class="item-center">ك</th>
+                    <th class="item-price">السعر</th>
+                    <th class="item-total">الإجمالي</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${itemsRows}
+                ${deliveryRow}
+            </tbody>
+        </table>
 
-                        <div class="sep"></div>
-                        <div class="center meta">شكراً لزيارتكم</div>
-                    </div>
-                </body>
-                </html>
-            `;
+        <div class="sep"></div>
+        <div class="totals">
+            <div><span>الأصناف</span><span>${Number(order.subtotal ?? 0).toFixed(2)} ج.م</span></div>
+            <div><span>الخصم</span><span>${Number(order.discount ?? 0).toFixed(2)} ج.م</span></div>
+            ${isDelivery ? `<div><span>التوصيل</span><span>${deliveryFee.toFixed(2)} ج.م</span></div>` : ''}
+            <div class="final"><span>الإجمالي</span><span>${Number(order.total ?? 0).toFixed(2)} ج.م</span></div>
+        </div>
+
+        <div class="sep"></div>
+        <div class="center meta">شكراً لزيارتكم</div>
+    </div>
+</body>
+</html>`;
 
             printWindow.document.open();
             printWindow.document.write(html);
             printWindow.document.close();
+            printWindow.onload = function() {
+                setTimeout(() => {
+                    printWindow.print();
+                }, 100);
+            };
+            printWindow.onafterprint = function() {
+                setTimeout(() => {
+                    printWindow.close();
+                }, 1000);
+            };
         });
     }
 </script>

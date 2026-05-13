@@ -41,7 +41,7 @@
                             <div>
                                 <h3 class="text-xl font-semibold text-green-800 dark:text-green-200">الوردية مفتوحة</h3>
                                 <p class="text-green-600 dark:text-green-400">
-                                    بدأت في: {{ $activeShift->created_at->format('H:i d/m/Y') }}
+                                    بدأت في: {{ optional($activeShift->opened_at ?? $activeShift->created_at)->format('H:i d/m/Y') }}
                                 </p>
                             </div>
                         </div>

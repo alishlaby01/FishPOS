@@ -15,7 +15,7 @@ class OrderManager extends Component
 
     public $search = '';
 
-    public $statusFilter = '';
+    public $typeFilter = '';
 
     public $dateFilter = '';
 
@@ -26,7 +26,7 @@ class OrderManager extends Component
         $this->resetPage();
     }
 
-    public function updatedStatusFilter()
+    public function updatedTypeFilter()
     {
         $this->resetPage();
     }
@@ -151,7 +151,7 @@ class OrderManager extends Component
             ->when($activeShift, fn ($query) => $query->where('shift_id', $activeShift->id))
             ->when(! $activeShift && Auth::user()?->role === 'cashier', fn ($query) => $query->whereRaw('1 = 0'))
             ->when($this->search, fn ($query) => $query->where('invoice_number', 'like', '%'.$this->search.'%'))
-            ->when($this->statusFilter, fn ($query) => $query->where('status', $this->statusFilter))
+            ->when($this->typeFilter, fn ($query) => $query->where('order_type', $this->typeFilter))
             ->when($this->dateFilter, fn ($query) => $query->whereDate('created_at', $this->dateFilter))
             ->orderBy('created_at', 'desc')
             ->paginate(15);

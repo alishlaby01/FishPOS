@@ -40,7 +40,7 @@ class ShiftController extends Controller
         }
     }
 
-    public function close(Shift $shift): RedirectResponse
+    public function close(Request $request, Shift $shift): RedirectResponse
     {
         // التحقق من أن الوردية تخص المستخدم الحالي
         if ($shift->user_id !== auth()->id()) {
@@ -52,15 +52,23 @@ class ShiftController extends Controller
             return redirect()->back()->withErrors(['shift' => 'الوردية مغلقة بالفعل']);
         }
 
+        $request->validate([
+            'actual_cash' => 'required|numeric|min:0',
+        ]);
+
         try {
             // نفس منطق ShiftManager: مبيعات الطلبات المكتملة فقط
             $ordersQuery = $shift->orders()->where('status', 'completed');
             $totalSales = (float) (clone $ordersQuery)->sum('total');
             $totalExpenses = (float) $shift->expenses()->sum('amount');
+            $expectedCash = $shift->opening_cash + $totalSales - $totalExpenses;
+            $actualCash = (float) $request->input('actual_cash');
 
             $shift->update([
                 'closed_at' => now(),
-                'expected_cash' => $shift->opening_cash + $totalSales - $totalExpenses,
+                'expected_cash' => $expectedCash,
+                'actual_cash' => $actualCash,
+                'discrepancy' => $actualCash - $expectedCash,
                 'total_sales' => $totalSales,
                 'total_expenses' => $totalExpenses,
             ]);

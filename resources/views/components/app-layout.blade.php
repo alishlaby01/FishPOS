@@ -24,7 +24,7 @@
         }
     </style>
 </head>
-<body class="bg-surface text-on-surface font-cairo overflow-hidden h-screen flex flex-col">
+<body class="bg-surface text-on-surface font-cairo overflow-auto min-h-screen flex flex-col">
     {{ $slot }}
 
     <!-- Toast Notifications -->

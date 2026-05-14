@@ -45,13 +45,18 @@
                                 </p>
                             </div>
                         </div>
-                        <form method="POST" action="{{ route('shifts.close', $activeShift) }}" class="inline">
+                        <form method="POST" action="{{ route('shifts.close', $activeShift) }}" class="inline-flex flex-wrap items-center gap-3">
                             @csrf
                             @method('PATCH')
+                            <input type="number" name="actual_cash" step="0.01" min="0" placeholder="المبلغ الفعلي في الدراجة"
+                                class="w-full max-w-xs px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required>
                             <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition">
                                 إغلاق الوردية 🏁
                             </button>
                         </form>
+                        @error('actual_cash')
+                            <p class="mt-2 text-sm text-red-500">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
 
@@ -111,6 +116,7 @@
                             $shiftDeliveryFees = $shiftOrders->sum('delivery_fee');
                             $shiftOrderCount = $shiftOrders->count();
                             $shiftExpenses = \App\Models\Expense::where('shift_id', $activeShift->id)->sum('amount');
+                            $expectedCash = $activeShift->opening_cash + $shiftSales - $shiftExpenses;
                         @endphp
 
                         <div class="text-center">
@@ -136,6 +142,10 @@
                         <div class="text-center">
                             <div class="text-2xl font-bold text-purple-600">{{ number_format($shiftSales - $shiftExpenses, 2) }}</div>
                             <div class="text-sm text-gray-600 dark:text-gray-400">صافي الوردية</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-slate-900 dark:text-slate-100">{{ number_format($expectedCash, 2) }}</div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">المبلغ المتوقع في الدراجة</div>
                         </div>
                     </div>
                 </div>

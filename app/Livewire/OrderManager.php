@@ -147,15 +147,20 @@ class OrderManager extends Component
             ->whereNull('closed_at')
             ->first();
 
-        $orders = Order::with(['orderItems.product', 'creator'])
+        $baseQuery = Order::query()
             ->when($activeShift, fn ($query) => $query->where('shift_id', $activeShift->id))
             ->when(! $activeShift && Auth::user()?->role === 'cashier', fn ($query) => $query->whereRaw('1 = 0'))
             ->when($this->search, fn ($query) => $query->where('invoice_number', 'like', '%'.$this->search.'%'))
             ->when($this->typeFilter, fn ($query) => $query->where('order_type', $this->typeFilter))
-            ->when($this->dateFilter, fn ($query) => $query->whereDate('created_at', $this->dateFilter))
+            ->when($this->dateFilter, fn ($query) => $query->whereDate('created_at', $this->dateFilter));
+
+        $totalSales = (float) (clone $baseQuery)->sum('total');
+
+        $orders = $baseQuery
+            ->with(['orderItems.product', 'creator'])
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
-        return view('livewire.order-manager', compact('orders', 'activeShift'));
+        return view('livewire.order-manager', compact('orders', 'activeShift', 'totalSales'));
     }
 }

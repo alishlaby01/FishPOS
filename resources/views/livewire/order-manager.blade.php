@@ -1,6 +1,6 @@
 <div class="p-6">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100">إدارة الطلبات</h3>
+        <h3 class="text-2xl font-bold text-gray-900 dark:text-gray-100">كل الطلبات</h3>
         <div class="flex flex-wrap gap-3">
             <a href="{{ route('cashier') }}" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
                 الرجوع الى الكاشير
@@ -42,6 +42,17 @@
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">التاريخ</label>
                 <input wire:model.live="dateFilter" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="rounded-lg border border-gray-200 bg-white px-4 py-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+            <div class="font-semibold text-gray-900 dark:text-gray-100">إجمالي قيمة الفواتير</div>
+            <div class="mt-2 text-xl font-bold text-green-700 dark:text-green-300">{{ number_format($totalSales, 2) }} جنيه مصري</div>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white px-4 py-4 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+            <div class="font-semibold text-gray-900 dark:text-gray-100">عدد الفواتير</div>
+            <div class="mt-2 text-xl font-bold text-slate-800 dark:text-slate-200">{{ $orders->total() }}</div>
         </div>
     </div>
 
@@ -129,10 +140,10 @@
 
     <!-- Modal لعرض تفاصيل الطلب -->
     @if(isset($selectedOrder))
-    <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" id="order-modal">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800">
+    <div class="fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-start justify-center overflow-y-auto" id="order-modal">
+        <div class="relative my-8 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
             <div class="mt-3">
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center justify-between mb-4 sticky top-0 bg-white dark:bg-gray-800">
                     <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">تفاصيل الطلب: {{ $selectedOrder->invoice_number }}</h3>
                     <button type="button" wire:click="closeOrderModal" class="text-gray-400 hover:text-gray-600">
                         <span class="text-2xl">&times;</span>

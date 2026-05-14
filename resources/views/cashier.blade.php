@@ -14,7 +14,6 @@
     
 
     <livewire:pos-screen />
-    <livewire:shift-manager />
     @livewireScripts
 </body>
 </html>

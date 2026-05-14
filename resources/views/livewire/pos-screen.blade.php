@@ -19,6 +19,9 @@
                 <a href="{{ route('home') }}" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700">
                     الرئيسية
                 </a>
+                <a href="{{ route('cashier-dashboard') }}" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500">
+                    لوحة تحكم الكاشير
+                </a>
                 <a href="{{ route('cashier') }}" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700">
                     شاشة الكاشير
                 </a>
@@ -28,13 +31,9 @@
                 <a href="{{ route('expenses') }}" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700">
                     المصروفات
                 </a>
-                <button
-                    type="button"
-                    wire:click="$dispatch('openShiftManager')"
-                    class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-amber-500/30 transition hover:bg-amber-500"
-                >
+                <a href="{{ route('cashier-dashboard') }}" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-amber-500/30 transition hover:bg-amber-500">
                     إدارة الوردية
-                </button>
+                </a>
                 @if(auth()->user()?->role === 'owner')
                     <a href="{{ route('products') }}" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700">
                         المنتجات والأسعار

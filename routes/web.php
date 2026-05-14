@@ -1,11 +1,14 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use Carbon\Carbon;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ShiftController;
 use App\Livewire\Stock\MorningEntry;
 use App\Models\Expense;
 use App\Models\Order;
+use App\Models\Shift;
 use App\Models\StockEntry;
 
 Route::get('/', function () {
@@ -48,42 +51,71 @@ Route::middleware('auth')->group(function () {
     })->name('cashier');
 
     // شاشة التقارير (للمالك فقط)
-    Route::get('/summary', function () {
+    Route::get('/summary', function (Request $request) {
         $user = request()->user();
         abort_unless($user && $user->role === 'owner', 403);
 
-        $todayOrders = Order::whereDate('created_at', today());
+        $dateInput = $request->input('date');
+        if ($dateInput && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateInput)) {
+            try {
+                $date = Carbon::createFromFormat('Y-m-d', $dateInput)->toDateString();
+            } catch (Exception $e) {
+                $date = today()->toDateString();
+            }
+        } else {
+            $date = today()->toDateString();
+        }
 
-        // إجمالي التحصيل اليومي
-        $sales = (clone $todayOrders)
+        $selectedShiftId = is_numeric($request->input('shift_id')) ? (int) $request->input('shift_id') : null;
+
+        $shiftOptions = Shift::with('user')
+            ->whereDate('closed_at', $date)
+            ->whereNotNull('closed_at')
+            ->orderBy('closed_at', 'desc')
+            ->get();
+
+        $selectedShift = null;
+        $shiftReports = $shiftOptions;
+        if ($selectedShiftId) {
+            $selectedShift = $shiftOptions->firstWhere('id', $selectedShiftId);
+            if ($selectedShift) {
+                $shiftReports = collect([$selectedShift]);
+            }
+        }
+
+        $ordersQuery = Order::query()->whereDate('created_at', $date);
+        $expensesQuery = Expense::query()->whereDate('created_at', $date);
+
+        if ($selectedShift) {
+            $ordersQuery->where('shift_id', $selectedShift->id);
+            $expensesQuery->where('shift_id', $selectedShift->id);
+        }
+
+        // إجمالي التحصيل حسب الفلتر
+        $sales = (clone $ordersQuery)
             ->selectRaw('SUM(total) as total_sales, COUNT(*) as total_orders, SUM(discount) as total_discounts')
             ->first();
 
-        $deliveryOrdersCount = (clone $todayOrders)->where('order_type', 'delivery')->count();
-        $takeawayOrdersCount = (clone $todayOrders)->where('order_type', 'takeaway')->count();
-        $storeOrdersCount = (clone $todayOrders)->where('order_type', 'store')->count();
+        $deliveryOrdersCount = (clone $ordersQuery)->where('order_type', 'delivery')->count();
+        $takeawayOrdersCount = (clone $ordersQuery)->where('order_type', 'takeaway')->count();
+        $storeOrdersCount = (clone $ordersQuery)->where('order_type', 'store')->count();
 
         // إجمالي المصاريف
-        $expenses = Expense::whereDate('created_at', today())->sum('amount');
+        $expenses = $expensesQuery->sum('amount');
 
         // صافي الربح (بدون تكلفة شراء — تم إلغاء سعر الشراء من النظام)
         $netProfit = ($sales->total_sales ?? 0) - $expenses;
 
         // تقرير الهالك
         $wasteReport = StockEntry::where('type', 'waste')
-            ->whereDate('created_at', today())
+            ->whereDate('created_at', $date)
             ->with('product')
             ->selectRaw('product_id, SUM(quantity) as total_waste, 
-                        (SELECT note FROM stock_entries se2 WHERE se2.product_id = stock_entries.product_id AND se2.type = "waste" AND DATE(se2.created_at) = CURDATE() GROUP BY note ORDER BY COUNT(*) DESC LIMIT 1) as most_common_reason')
+                        (SELECT note FROM stock_entries se2 WHERE se2.product_id = stock_entries.product_id AND se2.type = "waste" AND DATE(se2.created_at) = ? GROUP BY note ORDER BY COUNT(*) DESC LIMIT 1) as most_common_reason', [$date])
             ->groupBy('product_id')
             ->orderBy('total_waste', 'desc')
             ->limit(5)
-            ->get()
-            ->map(function ($item) {
-                $item->product_name = $item->product->name ?? 'غير معروف';
-
-                return $item;
-            });
+            ->get();
 
         $summary = (object) [
             'total_sales' => $sales->total_sales ?? 0,
@@ -97,7 +129,9 @@ Route::middleware('auth')->group(function () {
             'store_orders_count' => $storeOrdersCount,
         ];
 
-        return view('summary', compact('summary', 'wasteReport'));
+        $reportDate = Carbon::createFromFormat('Y-m-d', $date)->format('d/m/Y');
+
+        return view('summary', compact('summary', 'wasteReport', 'shiftReports', 'shiftOptions', 'selectedShift', 'date', 'reportDate'));
     })->name('summary')->middleware('auth');
 
     // شاشة إدخال المخزون الصباحي
